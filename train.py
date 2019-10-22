@@ -1,7 +1,8 @@
 import numpy as np
 import argparse
 import torch
-
+from torch.optim import Adam, RMSprop
+from tensorboardX import SummaryWriter
 
 from models import *
 from utils import *
@@ -16,8 +17,8 @@ parser.add_argument('--uid', type=str, default='WGAN',
                     help='Staging identifier (default: WGAN)')
 
 # data loader parameters
-parser.add_argument('--dataset-name', type=str, default='FashionMNIST',
-                    help='Name of dataset (default: FashionMNIST')
+parser.add_argument('--dataset-name', type=str, default='MNIST',
+                    help='Name of dataset (default: MNIST')
 
 parser.add_argument('--data-dir', type=str, default='data',
                     help='Path to dataset (default: data')
@@ -29,12 +30,22 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
 parser.add_argument('--epochs', type=int, default=25, metavar='N',
                     help='number of training epochs')
 
+# Noise dimension Generator
+parser.add_argument('--noise-dim', type=int, default=96, metavar='N',
+                    help='Noise dimension (default: 96)')
+
+# Noise dimension Generator
+parser.add_argument('--clip', type=int, default=0.01, metavar='N',
+                    help='Gradient clipping value (default: 0.01)')
+
 parser.add_argument('--log-dir', type=str, default='runs',
                     help='logging directory (default: logs)')
 
 # Device (GPU)
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='disables cuda (default: False')
+
+args = parser.parse_args()
 
 
 # Set cuda
@@ -75,20 +86,62 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
     D.train() if is_train else D.eval()
 
     # losses
+    G_batch_loss = 0
+    D_batch_loss = 0
 
     for batch_idx, (x, _) in enumerate(data_loader):
 
         x = x.cuda() if args.cuda else x
         batch_size = x.size(0)
 
-        if train:
+        if is_train:
+            G_optim.zero_grad()
+            D_optim.zero_grad()
 
-        # forward passes
+        # 1) TODO while not converged
 
+        # Optimize over Discriminator weights, freeze Generator
+        for p in G.parameters():
+            p.requires_grad = False
 
+        # Sample z from p(z)
+        z = sample_uniform_noise(batch_size, args.noise_dim).type(dtype)
 
+        # Generator forward
+        x_hat = G(z)
 
-        return
+        # Discriminator forward real data
+        y_hat_fake = D(x_hat.view(x.size(0), 1, 28, 28))
+        y_hat_real = D(x)
+
+        D_loss = torch.mean(y_hat_real - y_hat_fake)
+
+        D_batch_loss += D_loss.item() / batch_size
+
+        # TODO Discriminator loss backward and gradient clipping (parameter trick here)
+        if is_train:
+            D_loss.backward()
+            torch.nn.utils.clip_grad_norm_(D.parameters(), args.clip)
+            D_optim.step()
+
+        # 2) Optimize over Generator weights
+        for p in G.parameters():
+            p.requires_grad = True
+
+        # Generator forward, Discriminator forward
+        z = sample_uniform_noise(batch_size, args.noise_dim).type(dtype)
+        x_hat = G(z)
+        y_hat_fake = D(x_hat.view(x.size(0), 1, 28, 28))
+
+        # Generator loss backward
+        G_loss = - torch.mean(y_hat_fake)
+        G_batch_loss += G_loss.item() / batch_size
+
+        if is_train:
+            G_optim.zero_grad()
+            G_loss.backward()
+
+        return G_batch_loss / (batch_idx + 1), D_batch_loss / (batch_idx + 1)
 
 
 def execute_graph(G, D, G_optim, D_optim, loader, epoch, use_tb):
@@ -110,20 +163,20 @@ def execute_graph(G, D, G_optim, D_optim, loader, epoch, use_tb):
         logger.add_scalar(log_dir + '/D-valid-loss', D_v_loss, epoch)
 
     # Generate examples
+    return G_v_loss, D_v_loss
 
 
 # Model definitions
 D = DCGAN_Discriminator(1).type(dtype)
-G = DCGAN_Generator(1024).type(dtype)
+G = DCGAN_Generator(args.noise_dim).type(dtype)
 
 # init model weights (TODO)
-init_normal_weights(E, 0, 0.02)
 init_normal_weights(G, 0, 0.02)
 init_normal_weights(D, 0, 0.02)
 
 # TODO
-G_optim = Adam(G.parameters(), lr=1e-3)
-D_optim = Adam(D.parameters(), lr=1e-3)
+G_optim = RMSprop(G.parameters(), lr=1e-3)
+D_optim = RMSprop(D.parameters(), lr=1e-3)
 
 
 # Utils
@@ -132,5 +185,4 @@ best_loss = np.inf
 
 # Main training loop
 for epoch in range(1, num_epochs + 1):
-    _, _, _ = execute_graph(G, D, G_optim, D_optim, loader, epoch, use_tb)
-
+    _, _ = execute_graph(G, D, G_optim, D_optim, loader, epoch, use_tb)

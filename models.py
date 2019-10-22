@@ -15,15 +15,16 @@ class BatchReshape(nn.Module):
         self.shape = shape
 
     def forward(self, x):
-        return x.view(x.size(0), *self.shape)
+        return x.view(*self.shape)
 
 
-class DCGAN_Discriminator(nn.module):
+class DCGAN_Discriminator(nn.Module):
     def __init__(self, in_channels):
         super(DCGAN_Discriminator, self).__init__()
+        self.in_channels = in_channels
 
         self.network = nn.ModuleList([
-            nn.Conv2d(1, 32, kernel_size=5, stride=1),
+            nn.Conv2d(self.in_channels, 32, kernel_size=5, stride=1),
             nn.LeakyReLU(negative_slope=0.01, inplace=True),
             nn.MaxPool2d((2, 2), stride=(2, 2)),
             nn.Conv2d(32, 64, kernel_size=5, stride=1),
@@ -35,22 +36,25 @@ class DCGAN_Discriminator(nn.module):
             nn.Linear(1024, 1)
         ])
 
-        def forward(self, x):
-            return self.network(x)
+    def forward(self, x):
+        for layer in self.network:
+            x = layer(x)
+        return x
 
 
 class DCGAN_Generator(nn.Module):
     def __init__(self, noise_dim):
         super(DCGAN_Generator, self).__init__()
+        self.noise_dim = noise_dim
 
         self.network = nn.ModuleList([
-            nn.Linear(noise_dim, 1024),
+            nn.Linear(self.noise_dim, 1024),
             nn.ReLU(inplace=True),
             nn.BatchNorm1d(1024),
             nn.Linear(1024, 7 * 7 * 128),
             nn.ReLU(inplace=True),
             nn.BatchNorm1d(7 * 7 * 128),
-            BatchReshape(-1, 128, 7, 7),
+            BatchReshape((-1, 128, 7, 7)),
             nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(64),
@@ -59,5 +63,7 @@ class DCGAN_Generator(nn.Module):
             BatchFlatten()
         ])
 
-        def forward(self, x):
-            return self.network(x)
+    def forward(self, x):
+        for layer in self.network:
+            x = layer(x)
+        return x
