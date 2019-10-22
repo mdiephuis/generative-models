@@ -18,3 +18,13 @@ def init_normal_weights(module, mu, std):
         elif isinstance(m, nn.Sequential):
             for sub_mod in m:
                 init_normal_weights(sub_mod, mu, std)
+
+
+def generation_example(G, noise_dim, n_samples, img_shape, use_cuda):
+
+    z_real = sample_uniform_noise(n_samples, noise_dim)
+    z_real = z_real.cuda() if use_cuda else z_real
+
+    x_hat = G(z_real).cpu().view(n_samples, img_shape[0], img_shape[1], img_shape[2])
+
+    return x_hat

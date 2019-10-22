@@ -1,8 +1,9 @@
 import numpy as np
 import argparse
 import torch
-from torch.optim import Adam, RMSprop
+from torch.optim import RMSprop
 from tensorboardX import SummaryWriter
+import torchvision.utils as tvu
 
 from models import *
 from utils import *
@@ -27,8 +28,8 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input training batch-size')
 
 # Optimizer
-parser.add_argument('--epochs', type=int, default=25, metavar='N',
-                    help='number of training epochs')
+parser.add_argument('--epochs', type=int, default=50, metavar='N',
+                    help='number of training epochs (default: 50)')
 
 # Noise dimension Generator
 parser.add_argument('--noise-dim', type=int, default=96, metavar='N',
@@ -80,8 +81,8 @@ test_loader = loader.test_loader
 
 def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
 
-    img_shape = loader.img_shape[1:]
-    print(img_shape)
+    img_shape = loader.img_shape
+
     data_loader = loader.train_loader if is_train else loader.test_loader
 
     G.train() if is_train else G.eval()
@@ -100,31 +101,32 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
             G_optim.zero_grad()
             D_optim.zero_grad()
 
-        # 1) TODO while not converged
+        # 1) While not converged
+        for _ in range(5):
 
-        # Optimize over Discriminator weights, freeze Generator
-        for p in G.parameters():
-            p.requires_grad = False
+            # Optimize over Discriminator weights, freeze Generator
+            for p in G.parameters():
+                p.requires_grad = False
 
-        # Sample z from p(z)
-        z = sample_uniform_noise(batch_size, args.noise_dim).type(dtype)
+            # Sample z from p(z)
+            z = sample_uniform_noise(batch_size, args.noise_dim).type(dtype)
 
-        # Generator forward
-        x_hat = G(z)
+            # Generator forward
+            x_hat = G(z)
 
-        # Discriminator forward real data
-        y_hat_fake = D(x_hat.view(x.size(0), 1, 28, 28))
-        y_hat_real = D(x)
+            # Discriminator forward real data
+            y_hat_fake = D(x_hat.view(x.size(0), img_shape[0], img_shape[1], img_shape[2]))
+            y_hat_real = D(x)
 
-        D_loss = torch.mean(y_hat_real - y_hat_fake)
+            D_loss = torch.mean(y_hat_real - y_hat_fake)
 
-        D_batch_loss += D_loss.item() / batch_size
+            D_batch_loss += D_loss.item() / batch_size
 
-        # TODO Discriminator loss backward and gradient clipping (parameter trick here)
-        if is_train:
-            D_loss.backward()
-            torch.nn.utils.clip_grad_norm_(D.parameters(), args.clip)
-            D_optim.step()
+            # TODO Discriminator loss backward and gradient clipping (parameter trick here)
+            if is_train:
+                D_loss.backward()
+                torch.nn.utils.clip_grad_norm_(D.parameters(), args.clip)
+                D_optim.step()
 
         # 2) Optimize over Generator weights
         for p in G.parameters():
@@ -133,10 +135,10 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
         # Generator forward, Discriminator forward
         z = sample_uniform_noise(batch_size, args.noise_dim).type(dtype)
         x_hat = G(z)
-        y_hat_fake = D(x_hat.view(x.size(0), 1, 28, 28))
+        y_hat_fake = D(x_hat.view(x.size(0), img_shape[0], img_shape[1], img_shape[2]))
 
         # Generator loss backward
-        G_loss = - torch.mean(y_hat_fake)
+        G_loss = torch.mean(y_hat_fake)
         G_batch_loss += G_loss.item() / batch_size
 
         if is_train:
@@ -165,13 +167,11 @@ def execute_graph(G, D, G_optim, D_optim, loader, epoch, use_tb):
         logger.add_scalar(log_dir + '/D-valid-loss', D_v_loss, epoch)
 
     # Generate examples
-        img_shape = loader.img_shape[1:]
-
-        sample = generation_example(G, args.model_type, args.latent_size, 10, img_shape, args.cuda)
+        img_shape = loader.img_shape
+        sample = generation_example(G, args.noise_dim, 10, img_shape, args.cuda)
         sample = sample.detach()
         sample = tvu.make_grid(sample, normalize=True, scale_each=True)
         logger.add_image('generation example', sample, epoch)
-
 
     return G_v_loss, D_v_loss
 
@@ -185,8 +185,8 @@ init_normal_weights(G, 0, 0.02)
 init_normal_weights(D, 0, 0.02)
 
 # TODO
-G_optim = RMSprop(G.parameters(), lr=1e-3)
-D_optim = RMSprop(D.parameters(), lr=1e-3)
+G_optim = RMSprop(G.parameters(), lr=5e-5)
+D_optim = RMSprop(D.parameters(), lr=5e-5)
 
 
 # Utils
