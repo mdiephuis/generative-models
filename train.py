@@ -109,7 +109,7 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
                 p.requires_grad = False
 
             # Sample z from p(z)
-            z = sample_uniform_noise(batch_size, args.noise_dim).type(dtype)
+            z = sample_gauss_noise(batch_size, args.noise_dim).type(dtype)
 
             # Generator forward
             x_hat = G(z)
@@ -133,7 +133,7 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
             p.requires_grad = True
 
         # Generator forward, Discriminator forward
-        z = sample_uniform_noise(batch_size, args.noise_dim).type(dtype)
+        z = sample_gauss_noise(batch_size, args.noise_dim).type(dtype)
         x_hat = G(z)
         y_hat_fake = D(x_hat.view(x.size(0), img_shape[0], img_shape[1], img_shape[2]))
 

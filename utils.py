@@ -8,6 +8,10 @@ def sample_uniform_noise(batch_size, dim):
     return torch.Tensor(batch_size, dim).uniform_(-1, 1)
 
 
+def sample_gauss_noise(batch_size, dim):
+    return torch.Tensor(batch_size, dim).normal_(0, 1)
+
+
 def init_normal_weights(module, mu, std):
     for m in module.modules():
         if isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
