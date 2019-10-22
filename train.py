@@ -95,6 +95,13 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
     for batch_idx, (x, _) in enumerate(data_loader):
 
         x = x.cuda() if args.cuda else x
+
+        one = torch.FloatTensor([1])
+        minus_one = torch.FloatTensor([1]) * - 1
+
+        one = one.cuda() if args.cuda else one
+        minus_one = minus_one.cuda() if args.cuda else minus_one
+
         batch_size = x.size(0)
 
         if is_train:
