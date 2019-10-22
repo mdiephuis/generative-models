@@ -80,6 +80,8 @@ test_loader = loader.test_loader
 
 def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
 
+    img_shape = loader.img_shape[1:]
+    print(img_shape)
     data_loader = loader.train_loader if is_train else loader.test_loader
 
     G.train() if is_train else G.eval()
@@ -163,6 +165,14 @@ def execute_graph(G, D, G_optim, D_optim, loader, epoch, use_tb):
         logger.add_scalar(log_dir + '/D-valid-loss', D_v_loss, epoch)
 
     # Generate examples
+        img_shape = loader.img_shape[1:]
+
+        sample = generation_example(G, args.model_type, args.latent_size, 10, img_shape, args.cuda)
+        sample = sample.detach()
+        sample = tvu.make_grid(sample, normalize=True, scale_each=True)
+        logger.add_image('generation example', sample, epoch)
+
+
     return G_v_loss, D_v_loss
 
 
