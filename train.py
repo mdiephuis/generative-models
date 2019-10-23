@@ -114,6 +114,9 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
             # Optimize over Discriminator weights, freeze Generator
             for p in G.parameters():
                 p.requires_grad = False
+            
+            for p in D.parameters():
+                p.data.clamp_(args.clip, args.clip)
 
             # Sample z from p(z)
             z = sample_gauss_noise(batch_size, args.noise_dim).type(dtype)
@@ -132,7 +135,7 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
             # TODO Discriminator loss backward and gradient clipping (parameter trick here)
             if is_train:
                 D_loss.backward()
-                torch.nn.utils.clip_grad_norm_(D.parameters(), args.clip)
+#                torch.nn.utils.clip_grad_norm_(D.parameters(), args.clip)
                 D_optim.step()
 
         # 2) Optimize over Generator weights
