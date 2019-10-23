@@ -98,7 +98,7 @@ class MNIST_Discriminator(nn.Module):
         self.network = nn.ModuleList([
             nn.Linear(self.input_dim, self.hidden_dim),
             nn.ReLU(),
-            nn.Linear(self.hidden_dim, 1),
+            nn.Linear(self.hidden_dim, 1)
         ])
 
     def forward(self, x):

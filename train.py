@@ -35,7 +35,7 @@ parser.add_argument('--epochs', type=int, default=50, metavar='N',
 parser.add_argument('--noise-dim', type=int, default=10, metavar='N',
                     help='Noise dimension (default: 10)')
 
-# Noise dimension Generator
+# Clipping value
 parser.add_argument('--clip', type=int, default=0.01, metavar='N',
                     help='Gradient clipping value (default: 0.01)')
 
@@ -117,7 +117,7 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
 
             # Discriminator forward real data
             y_hat_fake = D(x_hat.view(x.size(0), -1))
-            y_hat_real = D(x)
+            y_hat_real = D(x.view(x.size(0), -1))
 
             D_loss = - (torch.mean(y_hat_real) - torch.mean(y_hat_fake))
 
@@ -127,8 +127,8 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
                 D_loss.backward()
                 D_optim.step()
 
-                for p in D.parameters():
-                    p.data.clamp_(-args.clip, args.clip)
+            for p in D.parameters():
+                p.data.clamp_(-args.clip, args.clip)
 
         # 2) Optimize over Generator weights
         for p in G.parameters():
@@ -179,13 +179,11 @@ def execute_graph(G, D, G_optim, D_optim, loader, epoch, use_tb):
 
 
 # MNIST Model definitions
+G = MNIST_Generator(args.noise_dim, 128, 28 * 28).type(dtype)
+D = MNIST_Discriminator(28 * 28, 128).type(dtype)
 
-G = MNIST_Generator(args.noise_dim, 128, 28 * 28)
-D = MNIST_Discriminator(28 * 28, 128)
-
-# init model weights (TODO)
-# init_normal_weights(G, 0, 0.02)
-# init_normal_weights(D, 0, 0.02)
+G.apply(init_xavier_weights)
+D.apply(init_xavier_weights)
 
 # TODO
 G_optim = RMSprop(G.parameters(), lr=1e-4)

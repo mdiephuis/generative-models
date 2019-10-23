@@ -23,6 +23,17 @@ def init_normal_weights(module, mu, std):
                 init_normal_weights(sub_mod, mu, std)
 
 
+def init_xavier_weights(module):
+    for m in module.modules():
+        if isinstance(m, nn.Linear) or isinstance(m, nn.Conv2d):
+            nn.init.xavier_uniform_(m.weight.data)
+            if hasattr(m, 'bias') and m.bias is not None:
+                nn.init.constant_(m.bias, 0.0)
+        elif isinstance(m, nn.Sequential):
+            for sub_mod in m:
+                init_xavier_weights(sub_mod)
+
+
 def generation_example(G, noise_dim, n_samples, img_shape, use_cuda):
 
     z_real = sample_uniform_noise(n_samples, noise_dim)
