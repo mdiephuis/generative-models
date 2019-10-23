@@ -6,6 +6,8 @@ class Loader(object):
     def __init__(self, dataset_ident, file_path, download, batch_size, data_transform, target_transform, use_cuda):
 
         kwargs = {'num_workers': 4, 'pin_memory': True} if use_cuda else {}
+        # This seems to be a bug, but disabling pin memory is way faster when using the GPU
+        kwargs = {}
 
         # set the dataset
         # NOTE: will need a refractor one we load more different datasets, that require custom classes
