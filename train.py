@@ -72,7 +72,8 @@ else:
 
 
 # Data set transforms
-transforms = None
+transforms = [transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]
+
 # Get train and test loaders for dataset
 loader = Loader(args.dataset_name, args.data_dir, True, args.batch_size, transforms, None, args.cuda)
 train_loader = loader.train_loader
@@ -180,7 +181,7 @@ def execute_graph(G, D, G_optim, D_optim, loader, curr_iter, use_tb):
             img_shape = loader.img_shape
             sample = generation_example(G, args.noise_dim, 10, img_shape, args.cuda)
             sample = sample.detach()
-            sample = tvu.make_grid(sample, normalize=False, scale_each=True)
+            sample = tvu.make_grid(sample, normalize=True, scale_each=True)
             logger.add_image('generation example', sample, curr_iter)
 
     return G_v_loss, D_v_loss
