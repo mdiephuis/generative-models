@@ -28,8 +28,8 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input training batch-size')
 
 # Optimizer
-parser.add_argument('--epochs', type=int, default=50, metavar='N',
-                    help='number of training epochs (default: 50)')
+parser.add_argument('--niter', type=int, default=5000, metavar='N',
+                    help='number of training iterations (default: 5000)')
 
 # Noise dimension Generator
 parser.add_argument('--noise-dim', type=int, default=10, metavar='N',
@@ -79,7 +79,7 @@ train_loader = loader.train_loader
 test_loader = loader.test_loader
 
 
-def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
+def train_validate(G, D, G_optim, D_optim, loader, curr_iter, is_train):
 
     img_shape = loader.img_shape
 
@@ -92,86 +92,89 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
     G_batch_loss = 0
     D_batch_loss = 0
 
-    for batch_idx, (x, _) in enumerate(data_loader):
+    # 1) While not converged
+    for _ in range(5):
 
+        x, _ = next(iter(data_loader))
         x = x.cuda() if args.cuda else x
 
         batch_size = x.size(0)
 
-        # 1) While not converged
-        for _ in range(5):
+        # Optimize over Discriminator weights, freeze Generator
+        for p in G.parameters():
+            p.requires_grad = False
 
-            # Optimize over Discriminator weights, freeze Generator
-            for p in G.parameters():
-                p.requires_grad = False
+        # Sample z from p(z)
+        z = sample_gauss_noise(batch_size, args.noise_dim).type(dtype)
 
-            # Sample z from p(z)
-            z = sample_gauss_noise(batch_size, args.noise_dim).type(dtype)
+        # Generator forward
+        x_hat = G(z)
 
-            # Generator forward
-            x_hat = G(z)
+        # Discriminator forward real data
+        y_hat_fake = D(x_hat.view(x.size(0), -1))
+        y_hat_real = D(x.view(x.size(0), -1))
 
-            # Discriminator forward real data
-            y_hat_fake = D(x_hat.view(x.size(0), -1))
-            y_hat_real = D(x.view(x.size(0), -1))
+        D_loss = - (torch.mean(y_hat_real) - torch.mean(y_hat_fake))
 
-            D_loss = - (torch.mean(y_hat_real) - torch.mean(y_hat_fake))
+        D_batch_loss += D_loss.item() / batch_size
 
-            D_batch_loss += D_loss.item() / batch_size
-
-            if is_train:
-                D_optim.zero_grad()
-                D_loss.backward()
-                D_optim.step()
+        if is_train:
+            D_optim.zero_grad()
+            D_loss.backward()
+            D_optim.step()
 
             for p in D.parameters():
                 p.data.clamp_(-args.clip, args.clip)
 
-        # 2) Optimize over Generator weights
-        for p in G.parameters():
-            p.requires_grad = True
+    # 2) Optimize over Generator weights
+    for p in G.parameters():
+        p.requires_grad = True
 
-        # Generator forward, Discriminator forward
-        z = sample_gauss_noise(batch_size, args.noise_dim).type(dtype)
-        x_hat = G(z)
-        y_hat_fake = D(x_hat.view(x.size(0), -1))
+    # Generator forward, Discriminator forward
+    z = sample_gauss_noise(batch_size, args.noise_dim).type(dtype)
+    x_hat = G(z)
+    y_hat_fake = D(x_hat.view(x.size(0), -1))
 
-        # Generator loss backward
-        G_loss = - torch.mean(y_hat_fake)
-        G_batch_loss += G_loss.item() / batch_size
+    # Generator loss backward
+    G_loss = - torch.mean(y_hat_fake)
+    G_batch_loss += G_loss.item() / batch_size
 
-        if is_train:
-            G_optim.zero_grad()
-            G_loss.backward()
-            G_optim.step()
+    if is_train:
+        G_optim.zero_grad()
+        G_loss.backward()
+        G_optim.step()
 
-        return G_batch_loss / (batch_idx + 1), D_batch_loss / (batch_idx + 1)
+    return G_batch_loss, D_batch_loss / 5
 
 
-def execute_graph(G, D, G_optim, D_optim, loader, epoch, use_tb):
+def execute_graph(G, D, G_optim, D_optim, loader, curr_iter, use_tb):
 
     # Training loss
-    G_t_loss, D_t_loss = train_validate(G, D, G_optim, D_optim, loader, epoch, is_train=True)
+    G_t_loss, D_t_loss = train_validate(G, D, G_optim, D_optim, loader, curr_iter, is_train=True)
 
     # Validation loss
-    G_v_loss, D_v_loss = train_validate(G, D, G_optim, D_optim, loader, epoch, is_train=False)
+    G_v_loss, D_v_loss = train_validate(G, D, G_optim, D_optim, loader, curr_iter, is_train=False)
 
-    print('=> Epoch: {} Average Train G loss: {:.4f}, D loss: {:.4f}'.format(epoch, G_t_loss, D_t_loss))
-    print('=> Epoch: {} Average Valid G loss: {:.4f}, D loss: {:.4f}'.format(epoch, G_v_loss, D_v_loss))
+    if curr_iter % 25 == 0:
 
-    if use_tb:
-        logger.add_scalar(log_dir + '/G-train-loss', G_t_loss, epoch)
-        logger.add_scalar(log_dir + '/D-train-loss', D_t_loss, epoch)
+        print('=> curr_iter: {} Average Train G loss: {:.4f}, D loss: {:.4f}'.format(curr_iter, G_t_loss, D_t_loss))
+        print('=> curr_iter: {} Average Valid G loss: {:.4f}, D loss: {:.4f}'.format(curr_iter, G_v_loss, D_v_loss))
 
-        logger.add_scalar(log_dir + '/G-valid-loss', G_v_loss, epoch)
-        logger.add_scalar(log_dir + '/D-valid-loss', D_v_loss, epoch)
+        # to do, only ever 100 iters
 
-    # Generate examples
-        img_shape = loader.img_shape
-        sample = generation_example(G, args.noise_dim, 10, img_shape, args.cuda)
-        sample = sample.detach()
-        sample = tvu.make_grid(sample, normalize=True, scale_each=True)
-        logger.add_image('generation example', sample, epoch)
+        if use_tb:
+            logger.add_scalar(log_dir + '/G-train-loss', G_t_loss, curr_iter)
+            logger.add_scalar(log_dir + '/D-train-loss', D_t_loss, curr_iter)
+
+            logger.add_scalar(log_dir + '/G-valid-loss', G_v_loss, curr_iter)
+            logger.add_scalar(log_dir + '/D-valid-loss', D_v_loss, curr_iter)
+
+        # Generate examples
+            img_shape = loader.img_shape
+            sample = generation_example(G, args.noise_dim, 10, img_shape, args.cuda)
+            sample = sample.detach()
+            sample = tvu.make_grid(sample, normalize=True, scale_each=True)
+            logger.add_image('generation example', sample, curr_iter)
 
     return G_v_loss, D_v_loss
 
@@ -180,8 +183,8 @@ def execute_graph(G, D, G_optim, D_optim, loader, epoch, use_tb):
 G = MNIST_Generator(args.noise_dim, 128, 28 * 28).type(dtype)
 D = MNIST_Discriminator(28 * 28, 128).type(dtype)
 
-G.apply(init_xavier_weights)
-D.apply(init_xavier_weights)
+# G.apply(init_xavier_weights)
+# D.apply(init_xavier_weights)
 
 # TODO
 G_optim = RMSprop(G.parameters(), lr=1e-4)
@@ -189,9 +192,9 @@ D_optim = RMSprop(D.parameters(), lr=1e-4)
 
 
 # Utils
-num_epochs = args.epochs
+num_iter = args.niter
 best_loss = np.inf
 
 # Main training loop
-for epoch in range(1, num_epochs + 1):
-    _, _ = execute_graph(G, D, G_optim, D_optim, loader, epoch, use_tb)
+for i in range(1, num_iter + 1):
+    _, _ = execute_graph(G, D, G_optim, D_optim, loader, i, use_tb)
