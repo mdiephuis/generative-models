@@ -31,9 +31,9 @@ class DCGAN_Discriminator(nn.Module):
             nn.LeakyReLU(negative_slope=0.01, inplace=True),
             nn.MaxPool2d((2, 2), stride=(2, 2)),
             BatchFlatten(),
-            nn.Linear(64 * 16, 1024),
+            nn.Linear(64 * 16, 512),
             nn.LeakyReLU(negative_slope=0.01, inplace=True),
-            nn.Linear(1024, 1)
+            nn.Linear(512, 1)
         ])
 
     def forward(self, x):
@@ -59,8 +59,46 @@ class DCGAN_Generator(nn.Module):
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(64),
             nn.ConvTranspose2d(64, 1, kernel_size=4, stride=2, padding=1),
-            nn.Tanh(),
+            nn.Sigmoid(),
             BatchFlatten()
+        ])
+
+    def forward(self, x):
+        for layer in self.network:
+            x = layer(x)
+        return x
+
+
+class MNIST_Generator(nn.Module):
+    def __init__(self, latent_dim, hidden_dim, output_dim):
+        super(MNIST_Generator, self).__init__()
+        self.latent_dim = latent_dim
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
+
+        self.network = nn.ModuleList([
+            nn.Linear(self.latent_dim, self.hidden_dim),
+            nn.ReLU(),
+            nn.Linear(self.hidden_dim, self.output_dim),
+            nn.Sigmoid()
+        ])
+
+    def forward(self, x):
+        for layer in self.network:
+            x = layer(x)
+        return x
+
+
+class MNIST_Discriminator(nn.Module):
+    def __init__(self, input_dim, hidden_dim):
+        super(MNIST_Discriminator, self).__init__()
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+
+        self.network = nn.ModuleList([
+            nn.Linear(self.input_dim, self.hidden_dim),
+            nn.ReLU(),
+            nn.Linear(self.hidden_dim, 1),
         ])
 
     def forward(self, x):

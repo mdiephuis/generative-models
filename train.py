@@ -32,8 +32,8 @@ parser.add_argument('--epochs', type=int, default=50, metavar='N',
                     help='number of training epochs (default: 50)')
 
 # Noise dimension Generator
-parser.add_argument('--noise-dim', type=int, default=96, metavar='N',
-                    help='Noise dimension (default: 96)')
+parser.add_argument('--noise-dim', type=int, default=10, metavar='N',
+                    help='Noise dimension (default: 10)')
 
 # Noise dimension Generator
 parser.add_argument('--clip', type=int, default=0.01, metavar='N',
@@ -96,12 +96,6 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
 
         x = x.cuda() if args.cuda else x
 
-        one = torch.FloatTensor([1])
-        minus_one = torch.FloatTensor([1]) * - 1
-
-        one = one.cuda() if args.cuda else one
-        minus_one = minus_one.cuda() if args.cuda else minus_one
-
         batch_size = x.size(0)
 
         if is_train:
@@ -114,9 +108,6 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
             # Optimize over Discriminator weights, freeze Generator
             for p in G.parameters():
                 p.requires_grad = False
-            
-            for p in D.parameters():
-                p.data.clamp_(args.clip, args.clip)
 
             # Sample z from p(z)
             z = sample_gauss_noise(batch_size, args.noise_dim).type(dtype)
@@ -125,18 +116,19 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
             x_hat = G(z)
 
             # Discriminator forward real data
-            y_hat_fake = D(x_hat.view(x.size(0), img_shape[0], img_shape[1], img_shape[2]))
+            y_hat_fake = D(x_hat.view(x.size(0), -1))
             y_hat_real = D(x)
 
-            D_loss = torch.mean(y_hat_real - y_hat_fake)
+            D_loss = - (torch.mean(y_hat_real) - torch.mean(y_hat_fake))
 
             D_batch_loss += D_loss.item() / batch_size
 
-            # TODO Discriminator loss backward and gradient clipping (parameter trick here)
             if is_train:
                 D_loss.backward()
-#                torch.nn.utils.clip_grad_norm_(D.parameters(), args.clip)
                 D_optim.step()
+
+                for p in D.parameters():
+                    p.data.clamp_(-args.clip, args.clip)
 
         # 2) Optimize over Generator weights
         for p in G.parameters():
@@ -145,10 +137,10 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
         # Generator forward, Discriminator forward
         z = sample_gauss_noise(batch_size, args.noise_dim).type(dtype)
         x_hat = G(z)
-        y_hat_fake = D(x_hat.view(x.size(0), img_shape[0], img_shape[1], img_shape[2]))
+        y_hat_fake = D(x_hat.view(x.size(0), -1))
 
         # Generator loss backward
-        G_loss = torch.mean(y_hat_fake)
+        G_loss = - torch.mean(y_hat_fake)
         G_batch_loss += G_loss.item() / batch_size
 
         if is_train:
@@ -186,17 +178,18 @@ def execute_graph(G, D, G_optim, D_optim, loader, epoch, use_tb):
     return G_v_loss, D_v_loss
 
 
-# Model definitions
-D = DCGAN_Discriminator(1).type(dtype)
-G = DCGAN_Generator(args.noise_dim).type(dtype)
+# MNIST Model definitions
+
+G = MNIST_Generator(args.noise_dim, 128, 28 * 28)
+D = MNIST_Discriminator(28 * 28, 128)
 
 # init model weights (TODO)
-init_normal_weights(G, 0, 0.02)
-init_normal_weights(D, 0, 0.02)
+# init_normal_weights(G, 0, 0.02)
+# init_normal_weights(D, 0, 0.02)
 
 # TODO
-G_optim = RMSprop(G.parameters(), lr=5e-5)
-D_optim = RMSprop(D.parameters(), lr=5e-5)
+G_optim = RMSprop(G.parameters(), lr=1e-4)
+D_optim = RMSprop(D.parameters(), lr=1e-4)
 
 
 # Utils
