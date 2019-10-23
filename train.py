@@ -92,11 +92,18 @@ def train_validate(G, D, G_optim, D_optim, loader, curr_iter, is_train):
     G_batch_loss = 0
     D_batch_loss = 0
 
-    # 1) While not converged
-    for _ in range(5):
+    # 1) While not converged, taken from:
+    # https://github.com/martinarjovsky/WassersteinGAN/blob/master/main.py
+    if curr_iter < 25 or curr_iter % 500 == 0:
+        D_iter = 100
+    else:
+        D_iter = 5
+
+    for _ in range(D_iter):
 
         x, _ = next(iter(data_loader))
         x = x.cuda() if args.cuda else x
+        x = x.view(x.size(0), img_shape[0], img_shape[1], img_shape[2])
 
         batch_size = x.size(0)
 
@@ -111,8 +118,8 @@ def train_validate(G, D, G_optim, D_optim, loader, curr_iter, is_train):
         x_hat = G(z)
 
         # Discriminator forward real data
-        y_hat_fake = D(x_hat.view(x.size(0), -1))
-        y_hat_real = D(x.view(x.size(0), -1))
+        y_hat_fake = D(x_hat.view(x.size(0), img_shape[0], img_shape[1], img_shape[2]))
+        y_hat_real = D(x)
 
         D_loss = - (torch.mean(y_hat_real) - torch.mean(y_hat_fake))
 
@@ -133,7 +140,7 @@ def train_validate(G, D, G_optim, D_optim, loader, curr_iter, is_train):
     # Generator forward, Discriminator forward
     z = sample_gauss_noise(batch_size, args.noise_dim).type(dtype)
     x_hat = G(z)
-    y_hat_fake = D(x_hat.view(x.size(0), -1))
+    y_hat_fake = D(x_hat.view(x.size(0), img_shape[0], img_shape[1], img_shape[2]))
 
     # Generator loss backward
     G_loss = - torch.mean(y_hat_fake)
@@ -173,22 +180,25 @@ def execute_graph(G, D, G_optim, D_optim, loader, curr_iter, use_tb):
             img_shape = loader.img_shape
             sample = generation_example(G, args.noise_dim, 10, img_shape, args.cuda)
             sample = sample.detach()
-            sample = tvu.make_grid(sample, normalize=True, scale_each=True)
+            sample = tvu.make_grid(sample, normalize=False, scale_each=True)
             logger.add_image('generation example', sample, curr_iter)
 
     return G_v_loss, D_v_loss
 
 
-# MNIST Model definitions
-G = MNIST_Generator(args.noise_dim, 128, 28 * 28).type(dtype)
-D = MNIST_Discriminator(28 * 28, 128).type(dtype)
+# # MNIST Model definitions
+# G = MNIST_Generator(args.noise_dim, 128, 28 * 28).type(dtype)
+# D = MNIST_Discriminator(28 * 28, 128).type(dtype)
 
-# G.apply(init_xavier_weights)
-# D.apply(init_xavier_weights)
+D = DCGAN_Discriminator(1).type(dtype)
+G = DCGAN_Generator(args.noise_dim).type(dtype)
+
+G.apply(init_wgan_weights)
+D.apply(init_wgan_weights)
 
 # TODO
-G_optim = RMSprop(G.parameters(), lr=1e-4)
-D_optim = RMSprop(D.parameters(), lr=1e-4)
+G_optim = RMSprop(G.parameters(), lr=5e-5)
+D_optim = RMSprop(D.parameters(), lr=5e-5)
 
 
 # Utils

@@ -34,11 +34,24 @@ def init_xavier_weights(module):
                 init_xavier_weights(sub_mod)
 
 
+def init_wgan_weights(m):
+    # https://github.com/martinarjovsky/WassersteinGAN/blob/master/main.py
+    classname = m.__class__.__name__
+    if classname.find('Conv') != -1:
+        m.weight.data.normal_(0.0, 0.02)
+    elif classname.find('BatchNorm') != -1:
+        m.weight.data.normal_(1.0, 0.02)
+        m.bias.data.fill_(0)
+
+
 def generation_example(G, noise_dim, n_samples, img_shape, use_cuda):
 
     z_real = sample_uniform_noise(n_samples, noise_dim)
     z_real = z_real.cuda() if use_cuda else z_real
 
     x_hat = G(z_real).cpu().view(n_samples, img_shape[0], img_shape[1], img_shape[2])
+
+    # due to tanh output layer in the generator
+    x_hat = x_hat * 0.5 + 0.5
 
     return x_hat

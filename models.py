@@ -59,7 +59,7 @@ class DCGAN_Generator(nn.Module):
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(64),
             nn.ConvTranspose2d(64, 1, kernel_size=4, stride=2, padding=1),
-            nn.Sigmoid(),
+            nn.Tanh(),
             BatchFlatten()
         ])
 
@@ -96,6 +96,7 @@ class MNIST_Discriminator(nn.Module):
         self.hidden_dim = hidden_dim
 
         self.network = nn.ModuleList([
+            BatchFlatten(),
             nn.Linear(self.input_dim, self.hidden_dim),
             nn.ReLU(),
             nn.Linear(self.hidden_dim, 1)
