@@ -98,10 +98,6 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
 
         batch_size = x.size(0)
 
-        if is_train:
-            G_optim.zero_grad()
-            D_optim.zero_grad()
-
         # 1) While not converged
         for _ in range(5):
 
@@ -124,6 +120,7 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
             D_batch_loss += D_loss.item() / batch_size
 
             if is_train:
+                D_optim.zero_grad()
                 D_loss.backward()
                 D_optim.step()
 
@@ -146,6 +143,7 @@ def train_validate(G, D, G_optim, D_optim, loader, epoch, is_train):
         if is_train:
             G_optim.zero_grad()
             G_loss.backward()
+            G_optim.step()
 
         return G_batch_loss / (batch_idx + 1), D_batch_loss / (batch_idx + 1)
 
