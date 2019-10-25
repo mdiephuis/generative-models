@@ -156,13 +156,27 @@ class VAEGAN_Encoder(nn.Module):
 
 
 class VAEGAN_Decoder(nn.Module):
-    def __init__(self, latent_dim, out_channels):
+    def __init__(self, latent_dim, in_channels, out_channels, batch_size):
         super(VAEGAN_Decoder, self).__init__()
         self.latent_dim = latent_dim
+        self.in_channels = in_channels
         self.out_channels = out_channels
+        self.batch_size = batch_size
+
+        self.network = nn.Sequential([
+            nn.Linear(self.latent_dim, 8 * 8 * self.in_channels),
+            nn.BatchNorm(),
+            nn.ReLU(),
+            BatchReshape((self.batch_size, -1, 8, 8)),
+            ConvTrBatchLeaky(self.out_channels, self.out_channels, kernel_size=5, padding=2, stride=2),
+            ConvTrBatchLeaky(self.out_channels, self.out_channels // 2, kernel_size=5, padding=2, stride=2),
+            ConvTrBatchLeaky(self.out_channels // 2, self.out_channels // 4, kernel_size=5, padding=2, stride=2),
+            nn.ConvTranspose2d(self.out_channels // 4, self.in_channels, kernel_size=5, padding=2, stride=1),
+            nn.Tanh()
+        ])
 
     def forward(self, x):
-        return
+        return self.network(x)
 
 
 class VAEGAN_Discriminator(nn.Module):
@@ -170,9 +184,18 @@ class VAEGAN_Discriminator(nn.Module):
         super(VAEGAN_Discriminator, self).__init__()
         self.in_channels = in_channels
 
+        self.network = nn.Sequential([
+            nn.Conv2d(self.in_channels, 32, kernel_size=5, stride=1, padding=2),
+            nn.ReLU(),
+            ConvBatchLeaky(32, 128, kernel_size=5, stride=1, padding=2),
+            ConvBatchLeaky(128, 256, kernel_size=5, stride=1, padding=2),
+            ConvBatchLeaky(256, 256, kernel_size=5, stride=1, padding=2),
+            nn.Linear(8 * 8 * 256, 512),
+            nn.BatchNorm(),
+            nn.ReLU(),
+            nn.Linear(512, 1),
+            nn.Sigmoid()
+        ])
+
     def forward(self, x):
-        return
-
-
-
-
+        return self.network(x)
