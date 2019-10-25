@@ -1,4 +1,6 @@
-# wasserstein-gan
+# Growing collection of generative models in pytorch
+
+## wasserstein-gan
 Pytorch implementation of the Wasserstein gan. [[Paper]](https://arxiv.org/abs/1701.07875)
 
 MNIST Generation results after 3000 iterations:
