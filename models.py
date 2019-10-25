@@ -18,6 +18,30 @@ class BatchReshape(nn.Module):
         return x.view(*self.shape)
 
 
+class ConvBatchLeaky(nn.Conv2d):
+    def __init__(self, lr_slope, *args, **kwargs):
+        super(ConvBatchLeaky, self).__init__(*args, **kwargs)
+        batch_dim = self.weight.data.size(0)
+        self.bn = nn.BatchNorm2d(batch_dim)
+        self.lr = nn.LeakyReLU(lr_slope)
+
+    def forward(self, x):
+        x = super(ConvBatchLeaky, self).forward(x)
+        return self.lr(self.bn(x))
+
+
+class ConvTrBatchLeaky(nn.ConvTranspose2d):
+    def __init__(self, lr_slope, *args, **kwargs):
+        super(ConvTrBatchLeaky, self).__init__(*args, **kwargs)
+        batch_dim = self.weight.data.size(1)
+        self.bn = nn.BatchNorm2d(batch_dim)
+        self.lr = nn.LeakyReLU(lr_slope)
+
+    def forward(self, x):
+        x = super(ConvTrBatchLeaky, self).forward(x)
+        return self.lr(self.bn(x))
+
+
 class DCGAN_Discriminator(nn.Module):
     def __init__(self, in_channels):
         super(DCGAN_Discriminator, self).__init__()
@@ -106,3 +130,49 @@ class MNIST_Discriminator(nn.Module):
         for layer in self.network:
             x = layer(x)
         return x
+
+
+class VAEGAN_Encoder(nn.Module):
+    def __init__(self, in_channels, latent_dim):
+        super(VAEGAN_Encoder, self).__init__()
+        self.in_channels = in_channels
+        self.latent_dim = latent_dim
+
+        self.basenet = nn.Sequential([
+            ConvBatchLeaky(self.in_channels, 64, kernel_size=5, padding=2, stride=2),
+            ConvBatchLeaky(64, 64 * 2, kernel_size=5, padding=2, stride=2),
+            ConvBatchLeaky(64 * 2, 64 * 4, kernel_size=5, padding=2, stride=2),
+            nn.BatchNorm2d(),
+            nn.ReLU()
+        ])
+        self.mu_encoder = nn.Linear(1024, self.latent_dim)
+        self.logvar_encoder = nn.Linear(1024, self.latent_dim)
+
+    def forward(self, x):
+        x = self.basenet(x)
+        mu = self.mu_encoder(x)
+        logvar = self.logvar_encoder(x)
+        return mu, logvar
+
+
+class VAEGAN_Decoder(nn.Module):
+    def __init__(self, latent_dim, out_channels):
+        super(VAEGAN_Decoder, self).__init__()
+        self.latent_dim = latent_dim
+        self.out_channels = out_channels
+
+    def forward(self, x):
+        return
+
+
+class VAEGAN_Discriminator(nn.Module):
+    def __init__(self, in_channels):
+        super(VAEGAN_Discriminator, self).__init__()
+        self.in_channels = in_channels
+
+    def forward(self, x):
+        return
+
+
+
+
