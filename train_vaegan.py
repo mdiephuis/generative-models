@@ -43,9 +43,15 @@ parser.add_argument("--lambda_mse", default=1e-6,
 parser.add_argument("--decay-mse", default=1,
                     action="store", type=float, help='MSE decay (default: 1')
 
+parser.add_argument("--margin", default=0.35,
+                    action="store", type=float, help='Margin (default: 0.35')
+
+parser.add_argument("--equilibrium", default=0.68,
+                    action="store", type=float, help='Equilibrium (default: 0.68')
 
 parser.add_argument("--lr", default=3e-4,
                     action="store", type=float, help='Learning rate (default: 3e-4')
+
 
 parser.add_argument("--decay-lr", default=0.75,
                     action="store", type=float, help='Learning rate decay (default: 0.75')
@@ -97,14 +103,18 @@ train_loader = loader.train_loader
 test_loader = loader.test_loader
 
 
-def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, loader, epoch, train):
+def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, train):
 
     model.train() if train else model.eval()
     data_loader = loader.train_loader if train else loader.test_loader
 
-    fn_loss_mse = nn.MSELoss()
+    fn_loss_mse = nn.MSELoss(reduction='sum')
 
-    for batch_idx, x, _ in enumerate(loader):
+    batch_encoder_loss = 0
+    batch_decoder_loss = 0
+    batch_discriminator_loss = 0
+
+    for batch_idx, x, _ in enumerate(data_loader):
         batch_size = x.size(0)
 
         x = to_cuda(x) if args.cuda else x
@@ -122,33 +132,75 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, loader, epoch, trai
         feature_loss = fn_loss_mse(x_features.view(batch_size, -1), x_hat_features.view(batch_size, -1))
 
         # bce over the labels for the discriminator/gan
-        bce_disc_y_x = -torch.sum(torch.log(y_x + 1e-3))
-        bce_disc_y_x_hat = -torch.sum(torch.log(1 - y_x_hat + 1e-3))
-        bce_disc_y_draw_hat = -torch.sum(torch.log(1 - y_draw_hat + 1e-3))
+        bce_disc_y_x = torch.sum(-torch.log(y_x + 1e-3))
+        bce_disc_y_x_hat = torch.sum(-torch.log(1 - y_x_hat + 1e-3))
+        bce_disc_y_draw_hat = torch.sum(-torch.log(1 - y_draw_hat + 1e-3))
         bce_disc_total = torch.sum(bce_disc_y_x + bce_disc_y_x_hat + bce_disc_y_draw_hat)
 
         # Aggregate losses
         encoder_loss = kld_loss + feature_loss
-        decoder_loss = args.lambda_mse * feature_loss - (1 - args.lambda_mse) * (bce_disc_total)
+        decoder_loss = lambda_mse * feature_loss - (1 - lambda_mse) * (bce_disc_total)
         discriminator_loss = bce_disc_total
 
+        # Reporting
+        batch_encoder_loss += torch.mean(encoder_loss).item() / batch_size
+        batch_decoder_loss += torch.mean(decoder_loss).item() / batch_size
+        batch_discriminator_loss += torch.mean(discriminator_loss).item() / batch_size
 
         # Encoder back
+        if train:
+            # Encoder is always trained
+            Enc_optim.zero_grad()
+            encoder_loss.backward()
+            Enc_optim.step()
 
+            # REF:
+            # Selectively train decoder and discriminator
+            if torch.mean(-torch.log(y_x + 1e-3)).item() < equilibrium - margin or \
+                    torch.mean(-torch.log(1 - y_draw_hat + 1e-3)).item() < equilibrium - margin:
+                train_disc = False
+            else:
+                train_disc = True
 
-        #
+            if torch.mean(-torch.log(y_x + 1e-3)).item() > equilibrium + margin or \
+                    torch.mean(-torch.log(1 - y_draw_hat + 1e-3)).item() > equilibrium + margin:
+                train_dec = False
+            else:
+                train_dec = True
 
-    pass
+            if train_disc is False and train_dec is False:
+                train_disc = True
+                train_dec = True
+
+            if train_dec:
+                Dec_optim.zero_grad()
+                decoder_loss.backward()
+                Dec_optim.step()
+
+            if train_disc:
+                Disc_optim.zero_grad()
+                discriminator_loss.backward()
+                Disc_optim.step()
+
+    # all done
+    batch_encoder_loss /= (batch_idx + 1)
+    batch_decoder_loss /= (batch_idx + 1)
+    batch_discriminator_loss /= (batch_idx + 1)
+
+    return batch_encoder_loss, batch_decoder_loss, batch_discriminator_loss
 
 
 def execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
-                  dec_schedular, disc_schedular, loader, epoch):
+                  dec_schedular, disc_schedular, margin, equilibrium, lambda_mse, loader, epoch):
 
-    t_loss = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, loader, epoch, True)
+    t_loss_enc, t_loss_dec, t_loss_disc = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, True)
 
-    v_loss = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, loader, epoch, False)
+    v_loss_enc, v_loss_dec, v_loss_disc = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, False)
 
-    # Step the schedular
+    # Step the schedulars
+    lr_encoder.step()
+    lr_decoder.step()
+    lr_discriminator.step()
 
     # use_tb
 
@@ -177,9 +229,25 @@ Disc_optim = RMSprop(params=vaegan.discriminator.parameters(), lr=args.lr, alpha
 # Scheduling
 enc_schedular = ExponentialLR(Enc_optim, gamma=args.decay_lr)
 dec_schedular = ExponentialLR(Dec_optim, gamma=args.decay_lr)
-disc_schedular = ExponentialLR(Disc_optim, gamma=args.decay_lr)
+disc_schedular = ExponentialLR(Disc_optim, gamma=args.lr_decay_lr)
 
 # Main epoch loop
+margin = args.margin
+equilibrium = args.equilibrium
+lambda_mse = args.lambda_mse
+
 for epoch in range(args.epochs):
-    _, _, _ execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
-                          dec_schedular, disc_schedular, loader, epoch)
+
+    _, _, _ = execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
+                            dec_schedular, disc_schedular, margin, equilibrium, lambda_mse, loader, epoch)
+    # REF FROM here
+    margin *= decay_margin
+    equilibrium *= decay_equilibrium
+    # margin non puo essere piu alto di equilibrium
+    if margin > equilibrium:
+        equilibrium = margin
+    lambda_mse *= decay_mse
+    if lambda_mse > 1:
+        lambda_mse = 1
+
+
