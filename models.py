@@ -156,10 +156,10 @@ class VAEGAN_Encoder(nn.Module):
         self.latent_dim = latent_dim
 
         self.basenet = nn.Sequential([
-            ConvBatchLeaky(self.in_channels, 64, kernel_size=5, padding=2, stride=2),
-            ConvBatchLeaky(64, 64 * 2, kernel_size=5, padding=2, stride=2),
-            ConvBatchLeaky(64 * 2, 64 * 4, kernel_size=5, padding=2, stride=2),
-            nn.BatchNorm2d(),
+            ConvBatchLeaky(self.in_channels, 64, kernel_size=5, stride=2, padding=2),
+            ConvBatchLeaky(64, 64 * 2, kernel_size=5, stride=2, padding=2),
+            ConvBatchLeaky(64 * 2, 64 * 4, kernel_size=5, stride=2, padding=2),
+            nn.BatchNorm2d(64 * 4),
             nn.ReLU()
         ])
         self.mu_encoder = nn.Linear(1024, self.latent_dim)
@@ -186,10 +186,10 @@ class VAEGAN_Decoder(nn.Module):
         ])
 
         self.decode_network = nn.Sequential([
-            ConvTrBatchLeaky(self.out_channels, self.out_channels, kernel_size=5, padding=2, stride=2),
-            ConvTrBatchLeaky(self.out_channels, self.out_channels // 2, kernel_size=5, padding=2, stride=2),
-            ConvTrBatchLeaky(self.out_channels // 2, self.out_channels // 4, kernel_size=5, padding=2, stride=2),
-            nn.ConvTranspose2d(self.out_channels // 4, self.in_channels, kernel_size=5, padding=2, stride=1),
+            ConvTrBatchLeaky(self.out_channels, self.out_channels, kernel_size=5, stride=2, padding=2),
+            ConvTrBatchLeaky(self.out_channels, self.out_channels // 2, kernel_size=5, stride=2, padding=2),
+            ConvTrBatchLeaky(self.out_channels // 2, self.out_channels // 4, kernel_size=5, stride=2, padding=2),
+            nn.ConvTranspose2d(self.out_channels // 4, self.in_channels, kernel_size=5, stride=1, padding=2),
             nn.Tanh()
         ])
 
