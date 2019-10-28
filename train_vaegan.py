@@ -1,7 +1,9 @@
 import numpy as np
 import argparse
 import torch
-from torch.optim import RMSprop
+from torch.optim import RMSprop, Adam, SGD
+from torch.optim.lr_scheduler import ExponentialLR, MultiStepLR
+
 from tensorboardX import SummaryWriter
 import torchvision.utils as tvu
 
@@ -25,7 +27,7 @@ parser.add_argument('--data-dir', type=str, default='data',
                     help='Path to dataset (default: data')
 
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
-                    help='input training batch-size')
+                    help='Input training batch-size')
 
 # Optimizer
 parser.add_argument('--epochs', type=int, default=12, metavar='N',
@@ -34,6 +36,26 @@ parser.add_argument('--epochs', type=int, default=12, metavar='N',
 # Noise dimension Generator
 parser.add_argument('--latent-size', type=int, default=10, metavar='N',
                     help='Latent size (default: 128)')
+
+parser.add_argument("--lambda_mse", default=1e-6,
+                    action="store", type=float, help='MSE weight (default: 1e6')
+
+parser.add_argument("--decay-mse", default=1,
+                    action="store", type=float, help='MSE decay (default: 1')
+
+
+parser.add_argument("--lr", default=3e-4,
+                    action="store", type=float, help='Learning rate (default: 3e-4')
+
+parser.add_argument("--decay-lr", default=0.75,
+                    action="store", type=float, help='Learning rate decay (default: 0.75')
+
+
+parser.add_argument("--decay-margin", default=1,
+                    action="store", type=float, help='Decay margin (default: 1')
+
+parser.add_argument("--decay-equilibrium", default=1,
+                    action="store", type=float, help='Decay equilibrium (default: 1')
 
 
 parser.add_argument('--log-dir', type=str, default='runs',
@@ -74,23 +96,22 @@ loader = Loader(args.dataset_name, args.data_dir, True, args.batch_size, transfo
 train_loader = loader.train_loader
 test_loader = loader.test_loader
 
+
 def train_validate():
-	pass
+    pass
+
 
 def execute_graph():
-	pass
+    pass
 
 
 # Model definitions
 
 
-
 # Init
 
 
-
-# Optimizer
-
+# Optimizers
 
 
 # Main epoch loop

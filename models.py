@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 
 
 class BatchFlatten(nn.Module):
@@ -28,6 +29,22 @@ class ConvBatchLeaky(nn.Conv2d):
     def forward(self, x):
         x = super(ConvBatchLeaky, self).forward(x)
         return self.lr(self.bn(x))
+
+
+class VEAGAN_ConvBlock(nn.Conv2d):
+    def __init__(self, lr_slope, *args, **kwargs):
+        super(VEAGAN_ConvBlock, self).__init__(*args, **kwargs)
+        batch_dim = self.weight.data.size(0)
+        self.bn = nn.BatchNorm2d(batch_dim)
+        self.lr = nn.LeakyReLU(lr_slope)
+
+    def forward(self, x, raw_output=False):
+        conv_out = super(VEAGAN_ConvBlock, self).forward(x)
+        x = self.lr(self.bn(conv_out))
+        if raw_output is True:
+            return x, conv_out
+        else:
+            return conv_out
 
 
 class ConvTrBatchLeaky(nn.ConvTranspose2d):
@@ -156,18 +173,19 @@ class VAEGAN_Encoder(nn.Module):
 
 
 class VAEGAN_Decoder(nn.Module):
-    def __init__(self, latent_dim, in_channels, out_channels, batch_size):
+    def __init__(self, latent_dim, in_channels, out_channels):
         super(VAEGAN_Decoder, self).__init__()
         self.latent_dim = latent_dim
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.batch_size = batch_size
 
-        self.network = nn.Sequential([
+        self.input_network = nn.Sequential([
             nn.Linear(self.latent_dim, 8 * 8 * self.in_channels),
             nn.BatchNorm(),
             nn.ReLU(),
-            BatchReshape((self.batch_size, -1, 8, 8)),
+        ])
+
+        self.decode_network = nn.Sequential([
             ConvTrBatchLeaky(self.out_channels, self.out_channels, kernel_size=5, padding=2, stride=2),
             ConvTrBatchLeaky(self.out_channels, self.out_channels // 2, kernel_size=5, padding=2, stride=2),
             ConvTrBatchLeaky(self.out_channels // 2, self.out_channels // 4, kernel_size=5, padding=2, stride=2),
@@ -176,7 +194,10 @@ class VAEGAN_Decoder(nn.Module):
         ])
 
     def forward(self, x):
-        return self.network(x)
+        x = self.input_network(x)
+        x = x.view(x.size(0), -1, 8, 8)
+        x = self.decode_network(x)
+        return x
 
 
 class VAEGAN_Discriminator(nn.Module):
@@ -184,12 +205,18 @@ class VAEGAN_Discriminator(nn.Module):
         super(VAEGAN_Discriminator, self).__init__()
         self.in_channels = in_channels
 
-        self.network = nn.Sequential([
+        self.input_network = nn.Sequential([
             nn.Conv2d(self.in_channels, 32, kernel_size=5, stride=1, padding=2),
-            nn.ReLU(),
-            ConvBatchLeaky(32, 128, kernel_size=5, stride=1, padding=2),
-            ConvBatchLeaky(128, 256, kernel_size=5, stride=1, padding=2),
-            ConvBatchLeaky(256, 256, kernel_size=5, stride=1, padding=2),
+            nn.ReLU()
+        ])
+
+        self.feature_network = nn.ModuleList([
+            VEAGAN_ConvBlock(32, 128, kernel_size=5, stride=1, padding=2),
+            VEAGAN_ConvBlock(128, 256, kernel_size=5, stride=1, padding=2),
+            VEAGAN_ConvBlock(256, 256, kernel_size=5, stride=1, padding=2),
+        ])
+
+        self.output_network = nn.Sequential([
             nn.Linear(8 * 8 * 256, 512),
             nn.BatchNorm(),
             nn.ReLU(),
@@ -197,5 +224,79 @@ class VAEGAN_Discriminator(nn.Module):
             nn.Sigmoid()
         ])
 
+    def forward(self, x, reconstruction_level=3, mode='reconstruction'):
+
+        # Input encoding network
+        x = self.input_network(x)
+
+        # Return intermediate convolution layer features for passed reconstruction_level
+        if mode == 'reconstruction':
+            for level, veagan_layer in enumerate(self.feature_network):
+                if level == reconstruction_level:
+                    x, conv_out = veagan_layer(x, True)
+                    # needs a view()
+                    return conv_out.view(x.size(0), -1)
+                else:
+                    x = veagan_layer(x, False)
+
+        # Traditional full forward
+        else:
+            # vaegan layers
+            for veagan_layer in self.feature_network:
+                x = veagan_layer(x, False)
+
+            # output encoding
+            x = self.output_network(x.view(x.size(0), -1))
+            return x
+
+
+class VAEGAN(nn.Module):
+    def __init__(self, in_channels, latent_dim=128, reconstruction_level=3):
+        super(VAEGAN, self).__init__()
+        self.in_channels = in_channels
+        self.latent_dim = latent_dim
+        self.reconstruction_level = reconstruction_level
+
+        self.encoder = VAEGAN_Encoder(self.in_channels, self.latent_dim)
+        self.decoder = VAEGAN_Decoder(self.latent_dim, self.in_channels, self.in_channels)
+        self.discriminator = VAEGAN_Discriminator(self.in_channels)
+
+    def reparametrize(self, mu, log_var):
+        variance = torch.exp(0.5 * log_var)
+        eps = torch.randn_like(variance)
+        z = eps.mul(variance).add_(mu)
+        return z
+
     def forward(self, x):
-        return self.network(x)
+
+        mu, log_var = self.encoder(x)
+        z = self.reparametrize(mu, log_var)
+        x_hat = self.decoder(z)
+
+        # discriminator intermediate layer output
+        x_features = self.discriminator(x, self.reconstruction_level, 'reconstruction')
+        x_hat_features = self.discriminator(x_hat, self.reconstruction_level, 'reconstruction')
+
+        # Draw an x from the z distribution
+        x_draw = torch.randn(x.size(0), self.latent_dim)
+
+        # Decode
+        x_draw_hat = self.decoder(x_draw)
+
+        # Discriminator class estimation
+        y_x = self.discriminator(x, mode='classifier')
+        y_x_hat = self.discriminator(x_hat, mode='classifier')
+        y_draw_hat = self.discriminator(x_draw_hat, mode='classifier')
+        return mu, log_var, x_hat, x_draw_hat, x_features, x_hat_features, y_x, y_x_hat, y_draw_hat
+
+    def reconstruct(self, x):
+        mu, log_var = self.encoder(x)
+        z = self.reparametrize(mu, log_var)
+        x_hat = self.decoder(z)
+        return x_hat
+
+    def generate(self, num_samples):
+        x_draw = torch.randn(num_samples, self.latent_dim)
+        x_draw_hat = self.decoder(x_draw)
+        return x_draw_hat
+
