@@ -34,7 +34,7 @@ parser.add_argument('--epochs', type=int, default=12, metavar='N',
                     help='Number of epochs (default: 12)')
 
 # Noise dimension Generator
-parser.add_argument('--latent-size', type=int, default=10, metavar='N',
+parser.add_argument('--latent-size', type=int, default=128, metavar='N',
                     help='Latent size (default: 128)')
 
 parser.add_argument("--lambda_mse", default=1e-6,
@@ -97,21 +97,89 @@ train_loader = loader.train_loader
 test_loader = loader.test_loader
 
 
-def train_validate():
+def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, loader, epoch, train):
+
+    model.train() if train else model.eval()
+    data_loader = loader.train_loader if train else loader.test_loader
+
+    fn_loss_mse = nn.MSELoss()
+
+    for batch_idx, x, _ in enumerate(loader):
+        batch_size = x.size(0)
+
+        x = to_cuda(x) if args.cuda else x
+
+        # base forward pass, no training
+        mu, log_var, x_hat, x_draw_hat, x_features, x_hat_features, y_x, y_x_hat, y_draw_hat = vaegan(x)
+
+        # negative loglikelihood loss
+        recon_loss = fn_loss_mse(x.view(batch_size, -1), x_hat.view(batch_size, -1))
+
+        # kl div against standard normal
+        kld_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
+
+        # MSE loss between intermediate layers
+        feature_loss = fn_loss_mse(x_features.view(batch_size, -1), x_hat_features.view(batch_size, -1))
+
+        # bce over the labels for the discriminator/gan
+        bce_disc_y_x = -torch.sum(torch.log(y_x + 1e-3))
+        bce_disc_y_x_hat = -torch.sum(torch.log(1 - y_x_hat + 1e-3))
+        bce_disc_y_draw_hat = -torch.sum(torch.log(1 - y_draw_hat + 1e-3))
+        bce_disc_total = torch.sum(bce_disc_y_x + bce_disc_y_x_hat + bce_disc_y_draw_hat)
+
+        # Aggregate losses
+        encoder_loss = kld_loss + feature_loss
+        decoder_loss = args.lambda_mse * feature_loss - (1 - args.lambda_mse) * (bce_disc_total)
+        discriminator_loss = bce_disc_total
+
+
+        # Encoder back
+
+
+        #
+
     pass
 
 
-def execute_graph():
-    pass
+def execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
+                  dec_schedular, disc_schedular, loader, epoch):
+
+    t_loss = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, loader, epoch, True)
+
+    v_loss = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, loader, epoch, False)
+
+    # Step the schedular
+
+    # use_tb
+
+    return _, _
+
 
 
 # Model definitions
+reconstruction_level = 3
+in_channels = 1
+
+vaegan = VAEGAN(in_channels, args.latent_size, reconstruction_level)
 
 
 # Init
-
+vaegan.apply(init_xavier_weights)
 
 # Optimizers
+Enc_optim = RMSprop(params=vaegan.encoder.parameters(), lr=args.lr, alpha=0.9, eps=1e-8,
+                    weight_decay=0, momentum=0, centered=False)
+Dec_optim = RMSprop(params=vaegan.decoder.parameters(), lr=args.lr, alpha=0.9, eps=1e-8,
+                    weight_decay=0, momentum=0, centered=False)
+Disc_optim = RMSprop(params=vaegan.discriminator.parameters(), lr=args.lr, alpha=0.9, eps=1e-8,
+                     weight_decay=0, momentum=0, centered=False)
 
+# Scheduling
+enc_schedular = ExponentialLR(Enc_optim, gamma=args.decay_lr)
+dec_schedular = ExponentialLR(Dec_optim, gamma=args.decay_lr)
+disc_schedular = ExponentialLR(Disc_optim, gamma=args.decay_lr)
 
 # Main epoch loop
+for epoch in range(args.epochs):
+    _, _, _ execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
+                          dec_schedular, disc_schedular, loader, epoch)

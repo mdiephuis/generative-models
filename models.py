@@ -299,4 +299,3 @@ class VAEGAN(nn.Module):
         x_draw = torch.randn(num_samples, self.latent_dim)
         x_draw_hat = self.decoder(x_draw)
         return x_draw_hat
-
