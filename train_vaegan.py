@@ -27,8 +27,8 @@ parser.add_argument('--dataset-name', type=str, default='MNIST',
 parser.add_argument('--data-dir', type=str, default='data',
                     help='Path to dataset (default: data')
 
-parser.add_argument('--batch-size', type=int, default=16, metavar='N',
-                    help='Input training batch-size')
+parser.add_argument('--batch-size', type=int, default=64, metavar='N',
+                    help='Input training batch-size (default: 64)')
 
 # Optimizer
 parser.add_argument('--epochs', type=int, default=12, metavar='N',
@@ -118,6 +118,7 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
     batch_discriminator_loss = 0
 
     for batch_idx, (x, _)in enumerate(data_loader):
+
         torch.cuda.empty_cache()
 
         batch_size = x.size(0)
@@ -221,6 +222,13 @@ def execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
         logger.add_scalar(log_dir + '/Decoder-valid-loss', v_loss_dec, epoch)
         logger.add_scalar(log_dir + '/Discriminator-valid-loss', v_loss_disc, epoch)
 
+        # Generate images
+        img_shape = loader.img_shape
+        sample = vaegan_generation_example(vaegan, args.latent_size, 10, img_shape, args.cuda)
+        sample = sample.detach()
+        sample = tvu.make_grid(sample, normalize=True, scale_each=True)
+        logger.add_image('generation example', sample, epoch)
+
     return
 
 
@@ -255,6 +263,7 @@ for epoch in range(args.epochs):
 
     execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
                   dec_schedular, disc_schedular, margin, equilibrium, lambda_mse, loader, epoch)
+
     # REF FROM here
     margin *= args.decay_margin
     equilibrium *= args.decay_equilibrium
