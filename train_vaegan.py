@@ -154,7 +154,7 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
             encoder_loss.backward()
             Enc_optim.step()
 
-            # REFERENCE:
+            # REF:
             # Selectively train decoder and discriminator
             if torch.mean(-torch.log(y_x + 1e-3)).item() < equilibrium - margin or \
                     torch.mean(-torch.log(1 - y_draw_hat + 1e-3)).item() < equilibrium - margin:
@@ -197,24 +197,15 @@ def execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
 
     v_loss_enc, v_loss_dec, v_loss_disc = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, False)
 
-    # Step the schedulers
+    # Step the schedulars
     lr_encoder.step()
     lr_decoder.step()
     lr_discriminator.step()
 
     # use_tb
-    if use_tb:
-        logger.add_scalar(log_dir + '/Enc-train-loss', t_loss_enc, epoch)
-        logger.add_scalar(log_dir + '/Dec-train-loss', t_loss_dec, epoch)
-        logger.add_scalar(log_dir + '/Disc-train-loss', t_loss_disc, epoch)
 
-        logger.add_scalar(log_dir + '/Enc-valid-loss', v_loss_enc, epoch)
-        logger.add_scalar(log_dir + '/Dec-valid-loss', v_loss_dec, epoch)
-        logger.add_scalar(log_dir + '/Disc-valid-loss', v_loss_disc, epoch)
+    return _, _
 
-        # TODO: image examples
-
-    return
 
 
 # Model definitions
@@ -238,7 +229,7 @@ Disc_optim = RMSprop(params=vaegan.discriminator.parameters(), lr=args.lr, alpha
 # Scheduling
 enc_schedular = ExponentialLR(Enc_optim, gamma=args.decay_lr)
 dec_schedular = ExponentialLR(Dec_optim, gamma=args.decay_lr)
-disc_schedular = ExponentialLR(Disc_optim, gamma=args.lr_decay_lr)
+disc_schedular = ExponentialLR(Disc_optim, gamma=args.decay_lr)
 
 # Main epoch loop
 margin = args.margin
@@ -247,13 +238,16 @@ lambda_mse = args.lambda_mse
 
 for epoch in range(args.epochs):
 
-    execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
-                  dec_schedular, disc_schedular, margin, equilibrium, lambda_mse, loader, epoch)
-    # REFERENCE FROM here
+    _, _, _ = execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
+                            dec_schedular, disc_schedular, margin, equilibrium, lambda_mse, loader, epoch)
+    # REF FROM here
     margin *= decay_margin
     equilibrium *= decay_equilibrium
+    # margin non puo essere piu alto di equilibrium
     if margin > equilibrium:
         equilibrium = margin
     lambda_mse *= decay_mse
     if lambda_mse > 1:
         lambda_mse = 1
+
+
