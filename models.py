@@ -186,11 +186,16 @@ class VAEGAN_Encoder(nn.Module):
             nn.BatchNorm2d(64 * 4),
             nn.ReLU()
         )
+        self.fc = nn.Sequential(nn.Linear(in_features=8 * 8 * 256, out_features=1024, bias=False),
+                                nn.BatchNorm1d(num_features=1024, momentum=0.9),
+                                nn.ReLU(True))
         self.mu_encoder = nn.Linear(1024, self.latent_dim)
         self.logvar_encoder = nn.Linear(1024, self.latent_dim)
 
     def forward(self, x):
         x = self.basenet(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
         mu = self.mu_encoder(x)
         logvar = self.logvar_encoder(x)
         return mu, logvar
@@ -236,9 +241,9 @@ class VAEGAN_Discriminator(nn.Module):
         )
 
         self.feature_network = nn.ModuleList([
-            VEAGAN_ConvBlock(32, 128, 5, 1, 2),
-            VEAGAN_ConvBlock(128, 256, 5, 1, 2),
-            VEAGAN_ConvBlock(256, 256, 5, 1, 2),
+            VEAGAN_ConvBlock(32, 128, 5, 2, 2),
+            VEAGAN_ConvBlock(128, 256, 5, 2, 2),
+            VEAGAN_ConvBlock(256, 256, 5, 2, 2),
         ])
 
         self.output_network = nn.Sequential(
@@ -271,7 +276,9 @@ class VAEGAN_Discriminator(nn.Module):
                 x = veagan_layer(x, False)
 
             # output encoding
-            x = self.output_network(x.view(x.size(0), -1))
+            print(x.size())
+            x = x.view(x.size(0), -1)
+            x = self.output_network(x)
             return x
 
 
@@ -303,7 +310,8 @@ class VAEGAN(nn.Module):
         x_hat_features = self.discriminator(x_hat, self.reconstruction_level, 'reconstruction')
 
         # Draw an x from the z distribution
-        x_draw = torch.randn(x.size(0), self.latent_dim)
+        # infere this later
+        x_draw = torch.randn(x.size(0), self.latent_dim).cuda()
 
         # Decode
         x_draw_hat = self.decoder(x_draw)
