@@ -1,9 +1,7 @@
-import numpy as np
-import os
 import argparse
 import torch
-from torch.optim import RMSprop, Adam, SGD
-from torch.optim.lr_scheduler import ExponentialLR, MultiStepLR
+from torch.optim import RMSprop
+from torch.optim.lr_scheduler import ExponentialLR
 
 from tensorboardX import SummaryWriter
 import torchvision.utils as tvu
@@ -31,8 +29,8 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='Input training batch-size (default: 64)')
 
 # Optimizer
-parser.add_argument('--epochs', type=int, default=12, metavar='N',
-                    help='Number of epochs (default: 12)')
+parser.add_argument('--epochs', type=int, default=100, metavar='N',
+                    help='Number of epochs (default: 100)')
 
 # Noise dimension Generator
 parser.add_argument('--latent-size', type=int, default=128, metavar='N',
@@ -111,15 +109,14 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
     vaegan.train() if train else vaegan.eval()
     data_loader = loader.train_loader if train else loader.test_loader
 
-    fn_loss_mse = nn.MSELoss(reduction='sum')
+    # was sum
+    fn_loss_mse = nn.MSELoss(reduction='mean')
 
     batch_encoder_loss = 0
     batch_decoder_loss = 0
     batch_discriminator_loss = 0
 
-    for batch_idx, (x, _)in enumerate(data_loader):
-
-        torch.cuda.empty_cache()
+    for batch_idx, (x, _) in enumerate(data_loader):
 
         batch_size = x.size(0)
 
@@ -156,9 +153,11 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
         # Encoder back
         if train:
             # Encoder is always trained
-            Enc_optim.zero_grad()
+            vaegan.zero_grad()
+            # Enc_optim.zero_grad()
             encoder_loss.backward(retain_graph=True)
             Enc_optim.step()
+            vaegan.zero_grad()
 
             # Selectively train decoder and discriminator
             # REFERENCE: https://github.com/lucabergamini/VAEGAN-PYTORCH
@@ -178,15 +177,15 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
                 train_disc = True
                 train_dec = True
 
-            if train_dec:
-                Dec_optim.zero_grad()
-                decoder_loss.backward(retain_graph=True)
-                Dec_optim.step()
+            # if train_dec:
+            Dec_optim.zero_grad()
+            decoder_loss.backward(retain_graph=True)
+            Dec_optim.step()
 
-            if train_disc:
-                Disc_optim.zero_grad()
-                discriminator_loss.backward()
-                Disc_optim.step()
+            # if train_disc:
+            Disc_optim.zero_grad()
+            discriminator_loss.backward()
+            Disc_optim.step()
 
     # all done
     batch_encoder_loss /= (batch_idx + 1)
@@ -218,9 +217,9 @@ def execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
         logger.add_scalar(log_dir + '/Decoder-train-loss', t_loss_dec, epoch)
         logger.add_scalar(log_dir + '/Discriminator-train-loss', t_loss_disc, epoch)
 
-        logger.add_scalar(log_dir + '/Encoder-valid-loss', v_loss_enc, epoch)
-        logger.add_scalar(log_dir + '/Decoder-valid-loss', v_loss_dec, epoch)
-        logger.add_scalar(log_dir + '/Discriminator-valid-loss', v_loss_disc, epoch)
+        # logger.add_scalar(log_dir + '/Encoder-valid-loss', v_loss_enc, epoch)
+        # logger.add_scalar(log_dir + '/Decoder-valid-loss', v_loss_dec, epoch)
+        # logger.add_scalar(log_dir + '/Discriminator-valid-loss', v_loss_disc, epoch)
 
         # Generate images
         img_shape = loader.img_shape
