@@ -55,3 +55,14 @@ def wgan_generation_example(G, noise_dim, n_samples, img_shape, use_cuda):
     x_hat = x_hat * 0.5 + 0.5
 
     return x_hat
+
+
+def vaegan_generation_example(vaegan, noise_dim, n_samples, img_shape, use_cuda):
+
+    x_hat = vaegan.generate(n_samples)
+    x_hat = x_hat.cpu().view(n_samples, img_shape[0], img_shape[1], img_shape[2])
+
+    # due to tanh output layer in the generator
+    x_hat = x_hat * 0.5 + 0.5
+
+    return x_hat
