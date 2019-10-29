@@ -105,7 +105,7 @@ test_loader = loader.test_loader
 
 def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, train):
 
-    model.train() if train else model.eval()
+    vaegan.train() if train else vaegan.eval()
     data_loader = loader.train_loader if train else loader.test_loader
 
     fn_loss_mse = nn.MSELoss(reduction='sum')
@@ -114,10 +114,10 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
     batch_decoder_loss = 0
     batch_discriminator_loss = 0
 
-    for batch_idx, x, _ in enumerate(data_loader):
+    for batch_idx, (x, _)in enumerate(data_loader):
         batch_size = x.size(0)
 
-        x = to_cuda(x) if args.cuda else x
+        x = x.cuda() if args.cuda else x
 
         # base forward pass, no training
         mu, log_var, x_hat, x_draw_hat, x_features, x_hat_features, y_x, y_x_hat, y_draw_hat = vaegan(x)
@@ -154,7 +154,7 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
             encoder_loss.backward()
             Enc_optim.step()
 
-            # REFERENCE:
+            # REF:
             # Selectively train decoder and discriminator
             if torch.mean(-torch.log(y_x + 1e-3)).item() < equilibrium - margin or \
                     torch.mean(-torch.log(1 - y_draw_hat + 1e-3)).item() < equilibrium - margin:
@@ -197,32 +197,20 @@ def execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
 
     v_loss_enc, v_loss_dec, v_loss_disc = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, False)
 
-    # Step the schedulers
+    # Step the schedulars
     lr_encoder.step()
     lr_decoder.step()
     lr_discriminator.step()
 
     # use_tb
-    if use_tb:
-        logger.add_scalar(log_dir + '/Enc-train-loss', t_loss_enc, epoch)
-        logger.add_scalar(log_dir + '/Dec-train-loss', t_loss_dec, epoch)
-        logger.add_scalar(log_dir + '/Disc-train-loss', t_loss_disc, epoch)
 
-        logger.add_scalar(log_dir + '/Enc-valid-loss', v_loss_enc, epoch)
-        logger.add_scalar(log_dir + '/Dec-valid-loss', v_loss_dec, epoch)
-        logger.add_scalar(log_dir + '/Disc-valid-loss', v_loss_disc, epoch)
-
-        # TODO: image examples
-
-    return
-
+    return _, _
 
 # Model definitions
 reconstruction_level = 3
 in_channels = 1
 
 vaegan = VAEGAN(in_channels, args.latent_size, reconstruction_level).type(dtype)
-
 
 # Init
 vaegan.apply(init_xavier_weights)
@@ -238,7 +226,7 @@ Disc_optim = RMSprop(params=vaegan.discriminator.parameters(), lr=args.lr, alpha
 # Scheduling
 enc_schedular = ExponentialLR(Enc_optim, gamma=args.decay_lr)
 dec_schedular = ExponentialLR(Dec_optim, gamma=args.decay_lr)
-disc_schedular = ExponentialLR(Disc_optim, gamma=args.lr_decay_lr)
+disc_schedular = ExponentialLR(Disc_optim, gamma=args.decay_lr)
 
 # Main epoch loop
 margin = args.margin
@@ -247,11 +235,12 @@ lambda_mse = args.lambda_mse
 
 for epoch in range(args.epochs):
 
-    execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
-                  dec_schedular, disc_schedular, margin, equilibrium, lambda_mse, loader, epoch)
-    # REFERENCE FROM here
+    _, _, _ = execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
+                            dec_schedular, disc_schedular, margin, equilibrium, lambda_mse, loader, epoch)
+    # REF FROM here
     margin *= decay_margin
     equilibrium *= decay_equilibrium
+    # margin non puo essere piu alto di equilibrium
     if margin > equilibrium:
         equilibrium = margin
     lambda_mse *= decay_mse
