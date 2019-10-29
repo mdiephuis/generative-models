@@ -160,8 +160,8 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
             encoder_loss.backward(retain_graph=True)
             Enc_optim.step()
 
-            # REF:
             # Selectively train decoder and discriminator
+            # REFERENCE: https://github.com/lucabergamini/VAEGAN-PYTORCH
             if torch.mean(-torch.log(y_x + 1e-3)).item() < equilibrium - margin or \
                     torch.mean(-torch.log(1 - y_draw_hat + 1e-3)).item() < equilibrium - margin:
                 train_disc = False
@@ -264,7 +264,8 @@ for epoch in range(args.epochs):
     execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
                   dec_schedular, disc_schedular, margin, equilibrium, lambda_mse, loader, epoch)
 
-    # REF FROM here
+    # Decay
+    # REFERENCE: https://github.com/lucabergamini/VAEGAN-PYTORCH
     margin *= args.decay_margin
     equilibrium *= args.decay_equilibrium
 
