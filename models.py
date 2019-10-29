@@ -31,12 +31,24 @@ class ConvBatchLeaky(nn.Conv2d):
         return self.lr(self.bn(x))
 
 
+class ConvBatchRelu(nn.Conv2d):
+    def __init__(self, *args, **kwargs):
+        super(ConvBatchRelu, self).__init__(*args, **kwargs)
+        batch_dim = self.weight.data.size(0)
+        self.bn = nn.BatchNorm2d(batch_dim)
+        self.lr = nn.ReLU()
+
+    def forward(self, x):
+        x = super(ConvBatchLeaky, self).forward(x)
+        return self.lr(self.bn(x))
+
+
 class VEAGAN_ConvBlock(nn.Conv2d):
-    def __init__(self, lr_slope, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(VEAGAN_ConvBlock, self).__init__(*args, **kwargs)
         batch_dim = self.weight.data.size(0)
         self.bn = nn.BatchNorm2d(batch_dim)
-        self.lr = nn.LeakyReLU(lr_slope)
+        self.lr = nn.ReLU()
 
     def forward(self, x, raw_output=False):
         conv_out = super(VEAGAN_ConvBlock, self).forward(x)
@@ -53,6 +65,18 @@ class ConvTrBatchLeaky(nn.ConvTranspose2d):
         batch_dim = self.weight.data.size(1)
         self.bn = nn.BatchNorm2d(batch_dim)
         self.lr = nn.LeakyReLU(lr_slope)
+
+    def forward(self, x):
+        x = super(ConvTrBatchLeaky, self).forward(x)
+        return self.lr(self.bn(x))
+
+
+class ConvTrBatchRelu(nn.ConvTranspose2d):
+    def __init__(self, *args, **kwargs):
+        super(ConvTrBatchRelu, self).__init__(*args, **kwargs)
+        batch_dim = self.weight.data.size(1)
+        self.bn = nn.BatchNorm2d(batch_dim)
+        self.lr = nn.ReLU()
 
     def forward(self, x):
         x = super(ConvTrBatchLeaky, self).forward(x)
@@ -156,9 +180,9 @@ class VAEGAN_Encoder(nn.Module):
         self.latent_dim = latent_dim
 
         self.basenet = nn.Sequential(
-            ConvBatchLeaky(self.in_channels, 64, 5, 2, 2),
-            ConvBatchLeaky(64, 64 * 2, 5, 2, 2),
-            ConvBatchLeaky(64 * 2, 64 * 4, 5, 2, 2),
+            ConvBatchRelu(self.in_channels, 64, 5, 2, 2),
+            ConvBatchRelu(64, 64 * 2, 5, 2, 2),
+            ConvBatchRelu(64 * 2, 64 * 4, 5, 2, 2),
             nn.BatchNorm2d(64 * 4),
             nn.ReLU()
         )
@@ -187,9 +211,9 @@ class VAEGAN_Decoder(nn.Module):
         )
 
         self.decode_network = nn.Sequential(
-            ConvTrBatchLeaky(self.out_channels, self.size, 5, 2, 2),
-            ConvTrBatchLeaky(self.size, self.size // 2, 5, 2, 2),
-            ConvTrBatchLeaky(self.size // 2, self.size // 4, 5, 2, 2),
+            ConvTrBatchRelu(self.out_channels, self.size, 5, 2, 2),
+            ConvTrBatchRelu(self.size, self.size // 2, 5, 2, 2),
+            ConvTrBatchRelu(self.size // 2, self.size // 4, 5, 2, 2),
             nn.ConvTranspose2d(self.size // 4, self.in_channels, 5, 2, 1),
             nn.Tanh()
         )

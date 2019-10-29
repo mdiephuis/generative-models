@@ -105,7 +105,7 @@ test_loader = loader.test_loader
 
 def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, train):
 
-    model.train() if train else model.eval()
+    vaegan.train() if train else vaegan.eval()
     data_loader = loader.train_loader if train else loader.test_loader
 
     fn_loss_mse = nn.MSELoss(reduction='sum')
@@ -114,10 +114,10 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
     batch_decoder_loss = 0
     batch_discriminator_loss = 0
 
-    for batch_idx, x, _ in enumerate(data_loader):
+    for batch_idx, (x, _)in enumerate(data_loader):
         batch_size = x.size(0)
 
-        x = to_cuda(x) if args.cuda else x
+        x = x.cuda() if args.cuda else x
 
         # base forward pass, no training
         mu, log_var, x_hat, x_draw_hat, x_features, x_hat_features, y_x, y_x_hat, y_draw_hat = vaegan(x)
@@ -213,6 +213,7 @@ reconstruction_level = 3
 in_channels = 1
 
 vaegan = VAEGAN(in_channels, args.latent_size, reconstruction_level)
+print(vaegan)
 
 
 # Init
@@ -249,5 +250,3 @@ for epoch in range(args.epochs):
     lambda_mse *= decay_mse
     if lambda_mse > 1:
         lambda_mse = 1
-
-
