@@ -178,6 +178,7 @@ class VAEGAN_Decoder(nn.Module):
         self.latent_dim = latent_dim
         self.in_channels = in_channels
         self.out_channels = out_channels
+        self.size = 64 * 4
 
         self.input_network = nn.Sequential(
             nn.Linear(self.latent_dim, 8 * 8 * self.in_channels),
@@ -186,10 +187,10 @@ class VAEGAN_Decoder(nn.Module):
         )
 
         self.decode_network = nn.Sequential(
-            ConvTrBatchLeaky(self.out_channels, self.out_channels, 5, 2, 2),
-            ConvTrBatchLeaky(self.out_channels, self.out_channels // 2, 5, 2, 2),
-            ConvTrBatchLeaky(self.out_channels // 2, self.out_channels // 4, 5, 2, 2),
-            nn.ConvTranspose2d(self.out_channels // 4, self.in_channels, 5, 2, 1),
+            ConvTrBatchLeaky(self.out_channels, self.size, 5, 2, 2),
+            ConvTrBatchLeaky(self.size, self.size // 2, 5, 2, 2),
+            ConvTrBatchLeaky(self.size // 2, self.size // 4, 5, 2, 2),
+            nn.ConvTranspose2d(self.size // 4, self.in_channels, 5, 2, 1),
             nn.Tanh()
         )
 
@@ -218,7 +219,7 @@ class VAEGAN_Discriminator(nn.Module):
 
         self.output_network = nn.Sequential(
             nn.Linear(8 * 8 * 256, 512),
-            nn.BatchNorm(),
+            nn.BatchNorm1d(512),
             nn.ReLU(),
             nn.Linear(512, 1),
             nn.Sigmoid()
