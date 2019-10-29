@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import argparse
 import torch
 from torch.optim import RMSprop, Adam, SGD
@@ -26,7 +27,7 @@ parser.add_argument('--dataset-name', type=str, default='MNIST',
 parser.add_argument('--data-dir', type=str, default='data',
                     help='Path to dataset (default: data')
 
-parser.add_argument('--batch-size', type=int, default=64, metavar='N',
+parser.add_argument('--batch-size', type=int, default=16, metavar='N',
                     help='Input training batch-size')
 
 # Optimizer
@@ -84,6 +85,8 @@ if use_tb:
 
 # Enable CUDA, set tensor type and device
 args.cuda = not args.no_cuda and torch.cuda.is_available()
+os.environ["CUDA_VISIBLE_DEVICES"] = str(3)
+
 
 if args.cuda:
     dtype = torch.cuda.FloatTensor
@@ -115,6 +118,8 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
     batch_discriminator_loss = 0
 
     for batch_idx, (x, _)in enumerate(data_loader):
+        torch.cuda.empty_cache()
+
         batch_size = x.size(0)
 
         x = x.cuda() if args.cuda else x
@@ -151,7 +156,7 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
         if train:
             # Encoder is always trained
             Enc_optim.zero_grad()
-            encoder_loss.backward()
+            encoder_loss.backward(retain_graph=True)
             Enc_optim.step()
 
             # REF:
@@ -174,7 +179,7 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
 
             if train_dec:
                 Dec_optim.zero_grad()
-                decoder_loss.backward()
+                decoder_loss.backward(retain_graph=True)
                 Dec_optim.step()
 
             if train_disc:
@@ -192,10 +197,16 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
 
 def execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
                   dec_schedular, disc_schedular, margin, equilibrium, lambda_mse, loader, epoch):
+    print('====> Epoch: {} <===='.format(epoch))
 
     t_loss_enc, t_loss_dec, t_loss_disc = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, True)
 
-    v_loss_enc, v_loss_dec, v_loss_disc = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, False)
+    # v_loss_enc, v_loss_dec, v_loss_disc = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, False)
+
+    print('====> Epoch: {} Train loss encoder: {:.4f} --- decoder: {:.4f} --- discriminator: {:.4f}'.format(
+          epoch, t_loss_enc, t_loss_dec, t_loss_disc))
+    # print('====> Epoch: {} Validation loss: encoder: {:.4f} --- decoder: {:.4f} --- discriminator: {:.4f}'.format(
+    #       epoch, v_loss_enc, v_loss_dec, v_loss_disc))
 
     # Step the schedulars
     lr_encoder.step()
@@ -207,7 +218,7 @@ def execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
     return _, _
 
 # Model definitions
-reconstruction_level = 3
+reconstruction_level = 2
 in_channels = 1
 
 vaegan = VAEGAN(in_channels, args.latent_size, reconstruction_level).type(dtype)

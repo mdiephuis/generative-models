@@ -303,19 +303,24 @@ class VAEGAN(nn.Module):
         mu, log_var = self.encoder(x)
         z = self.reparametrize(mu, log_var)
         x_hat = self.decoder(z)
+        torch.cuda.empty_cache()
 
         # discriminator intermediate layer output
         x_features = self.discriminator(x, self.reconstruction_level, 'reconstruction')
         x_hat_features = self.discriminator(x_hat, self.reconstruction_level, 'reconstruction')
+        torch.cuda.empty_cache()
 
         # Draw an x from the z distribution
         # infere this later
         x_draw = torch.randn(x.size(0), self.latent_dim).cuda()
+        torch.cuda.empty_cache()
 
         # Decode
         x_draw_hat = self.decoder(x_draw)
 
         # Discriminator class estimation
+        torch.cuda.empty_cache()
+
         y_x = self.discriminator(x, mode='classifier')
         y_x_hat = self.discriminator(x_hat, mode='classifier')
         y_draw_hat = self.discriminator(x_draw_hat, mode='classifier')
