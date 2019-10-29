@@ -11,4 +11,4 @@ MNIST Generation results after 3000 iterations:
 
 
 ## vae-gan
-Pytorch implementation of the VAEGAN gan. [[Paper]](https://arxiv.org/abs/1512.09300)
+Pytorch implementation of VAEGAN. [[Paper]](https://arxiv.org/abs/1512.09300)
