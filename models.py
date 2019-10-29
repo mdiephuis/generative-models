@@ -39,7 +39,7 @@ class ConvBatchRelu(nn.Conv2d):
         self.lr = nn.ReLU()
 
     def forward(self, x):
-        x = super(ConvBatchLeaky, self).forward(x)
+        x = super(ConvBatchRelu, self).forward(x)
         return self.lr(self.bn(x))
 
 
@@ -79,7 +79,7 @@ class ConvTrBatchRelu(nn.ConvTranspose2d):
         self.lr = nn.ReLU()
 
     def forward(self, x):
-        x = super(ConvTrBatchLeaky, self).forward(x)
+        x = super(ConvTrBatchRelu, self).forward(x)
         return self.lr(self.bn(x))
 
 
