@@ -44,7 +44,7 @@ def init_wgan_weights(m):
         m.bias.data.fill_(0)
 
 
-def generation_example(G, noise_dim, n_samples, img_shape, use_cuda):
+def wgan_generation_example(G, noise_dim, n_samples, img_shape, use_cuda):
 
     z_real = sample_uniform_noise(n_samples, noise_dim)
     z_real = z_real.cuda() if use_cuda else z_real

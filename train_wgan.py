@@ -179,7 +179,7 @@ def execute_graph(G, D, G_optim, D_optim, loader, curr_iter, use_tb):
 
         # Generate examples
             img_shape = loader.img_shape
-            sample = generation_example(G, args.noise_dim, 10, img_shape, args.cuda)
+            sample = wgan_generation_example(G, args.noise_dim, 10, img_shape, args.cuda)
             sample = sample.detach()
             sample = tvu.make_grid(sample, normalize=True, scale_each=True)
             logger.add_image('generation example', sample, curr_iter)

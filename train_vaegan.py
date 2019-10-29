@@ -85,8 +85,8 @@ if use_tb:
 
 # Enable CUDA, set tensor type and device
 args.cuda = not args.no_cuda and torch.cuda.is_available()
-os.environ["CUDA_VISIBLE_DEVICES"] = str(3)
 
+torch.cuda.set_device(1)
 
 if args.cuda:
     dtype = torch.cuda.FloatTensor
@@ -197,25 +197,32 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
 
 def execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
                   dec_schedular, disc_schedular, margin, equilibrium, lambda_mse, loader, epoch):
-    print('====> Epoch: {} <===='.format(epoch))
 
     t_loss_enc, t_loss_dec, t_loss_disc = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, True)
 
-    # v_loss_enc, v_loss_dec, v_loss_disc = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, False)
+    v_loss_enc, v_loss_dec, v_loss_disc = train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, False)
 
-    print('====> Epoch: {} Train loss encoder: {:.4f} --- decoder: {:.4f} --- discriminator: {:.4f}'.format(
+    print('=> Epoch: {} Train loss encoder: {:.4f} - decoder: {:.4f} - discriminator: {:.4f}'.format(
           epoch, t_loss_enc, t_loss_dec, t_loss_disc))
-    # print('====> Epoch: {} Validation loss: encoder: {:.4f} --- decoder: {:.4f} --- discriminator: {:.4f}'.format(
-    #       epoch, v_loss_enc, v_loss_dec, v_loss_disc))
+    print('=> Epoch: {} Validation loss: encoder: {:.4f} - decoder: {:.4f} - discriminator: {:.4f}'.format(
+          epoch, v_loss_enc, v_loss_dec, v_loss_disc))
 
     # Step the schedulars
     lr_encoder.step()
     lr_decoder.step()
     lr_discriminator.step()
 
-    # use_tb
+    if use_tb:
+        logger.add_scalar(log_dir + '/Encoder-train-loss', t_loss_enc, epoch)
+        logger.add_scalar(log_dir + '/Decoder-train-loss', t_loss_dec, epoch)
+        logger.add_scalar(log_dir + '/Discriminator-train-loss', t_loss_disc, epoch)
 
-    return _, _
+        logger.add_scalar(log_dir + '/Encoder-valid-loss', v_loss_enc, epoch)
+        logger.add_scalar(log_dir + '/Decoder-valid-loss', v_loss_dec, epoch)
+        logger.add_scalar(log_dir + '/Discriminator-valid-loss', v_loss_disc, epoch)
+
+    return
+
 
 # Model definitions
 reconstruction_level = 2
@@ -246,8 +253,8 @@ lambda_mse = args.lambda_mse
 
 for epoch in range(args.epochs):
 
-    _, _, _ = execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
-                            dec_schedular, disc_schedular, margin, equilibrium, lambda_mse, loader, epoch)
+    execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
+                  dec_schedular, disc_schedular, margin, equilibrium, lambda_mse, loader, epoch)
     # REF FROM here
     margin *= decay_margin
     equilibrium *= decay_equilibrium
