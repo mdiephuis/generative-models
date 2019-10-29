@@ -221,7 +221,7 @@ def execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
 reconstruction_level = 3
 in_channels = 1
 
-vaegan = VAEGAN(in_channels, args.latent_size, reconstruction_level)
+vaegan = VAEGAN(in_channels, args.latent_size, reconstruction_level).type(dtype)
 
 
 # Init
