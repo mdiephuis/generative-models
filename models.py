@@ -210,16 +210,16 @@ class VAEGAN_Decoder(nn.Module):
         self.size = 64 * 4
 
         self.input_network = nn.Sequential(
-            nn.Linear(self.latent_dim, 8 * 8 * self.in_channels),
-            nn.BatchNorm1d(8 * 8 * self.in_channels),
+            nn.Linear(self.latent_dim, 8 * 8 * self.size),
+            nn.BatchNorm1d(8 * 8 * self.size),
             nn.ReLU(),
         )
 
         self.decode_network = nn.Sequential(
-            ConvTrBatchRelu(self.out_channels, self.size, 5, 2, 2),
-            ConvTrBatchRelu(self.size, self.size // 2, 5, 2, 2),
-            ConvTrBatchRelu(self.size // 2, self.size // 4, 5, 2, 2),
-            nn.ConvTranspose2d(self.size // 4, self.in_channels, 5, 2, 1),
+            ConvTrBatchRelu(self.size, self.size, 5, 2, 2, 1),
+            ConvTrBatchRelu(self.size, self.size // 2, 5, 2, 2, 1),
+            ConvTrBatchRelu(self.size // 2, self.size // 8, 5, 2, 2, 1),
+            nn.ConvTranspose2d(self.size // 8, self.in_channels, 5, 1, 2),
             nn.Tanh()
         )
 
@@ -276,7 +276,6 @@ class VAEGAN_Discriminator(nn.Module):
                 x = veagan_layer(x, False)
 
             # output encoding
-            print(x.size())
             x = x.view(x.size(0), -1)
             x = self.output_network(x)
             return x
