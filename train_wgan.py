@@ -40,7 +40,7 @@ parser.add_argument('--clip', type=int, default=0.01, metavar='N',
                     help='Gradient clipping value (default: 0.01)')
 
 parser.add_argument('--log-dir', type=str, default='runs',
-                    help='logging directory (default: logs)')
+                    help='logging directory (default: runs)')
 
 # Device (GPU)
 parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -209,3 +209,7 @@ best_loss = np.inf
 # Main training loop
 for i in range(1, num_iter + 1):
     _, _ = execute_graph(G, D, G_optim, D_optim, loader, i, use_tb)
+
+
+# TensorboardX logger
+logger.close()
