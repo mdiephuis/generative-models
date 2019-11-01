@@ -64,7 +64,7 @@ parser.add_argument("--decay-equilibrium", default=1,
 
 
 parser.add_argument('--log-dir', type=str, default='runs',
-                    help='logging directory (default: logs)')
+                    help='logging directory (default: runs)')
 
 # Device (GPU)
 parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -109,9 +109,6 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
     vaegan.train() if train else vaegan.eval()
     data_loader = loader.train_loader if train else loader.test_loader
 
-    # was sum
-    fn_loss_mse = nn.MSELoss(reduction='mean')
-
     batch_encoder_loss = 0
     batch_decoder_loss = 0
     batch_discriminator_loss = 0
@@ -125,25 +122,22 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
         # base forward pass, no training
         mu, log_var, x_hat, x_draw_hat, x_features, x_hat_features, y_x, y_draw_hat = vaegan(x)
 
-        # negative loglikelihood loss
-        recon_loss = fn_loss_mse(x.view(batch_size, -1), x_hat.view(batch_size, -1))
-
         # kl div against standard normal
         kld_loss = -0.5 * torch.sum(1 + log_var - mu.pow(2) - log_var.exp())
 
         # MSE loss between intermediate layers
-        feature_loss = fn_loss_mse(x_features.view(batch_size, -1), x_hat_features.view(batch_size, -1))
+        feature_loss = torch.sum(0.5 * (x_features - x_hat_features) ** 2, 1)
 
         # bce over the labels for the discriminator/gan
-        bce_disc_y_x = torch.sum(-torch.log(y_x + 1e-3))
+        bce_disc_y_x = -torch.log(y_x + 1e-3)
+
         # bce_disc_y_x_hat = torch.sum(-torch.log(1 - y_x_hat + 1e-3))
-        bce_disc_y_draw_hat = torch.sum(-torch.log(1 - y_draw_hat + 1e-3))
-        # bce_disc_total = torch.sum(bce_disc_y_x + bce_disc_y_x_hat + bce_disc_y_draw_hat)
+        bce_disc_y_draw_hat = -torch.log(1 - y_draw_hat + 1e-3)
 
         # Aggregate losses
-        encoder_loss = kld_loss + feature_loss
-        decoder_loss = lambda_mse * feature_loss - (1 - lambda_mse) * (bce_disc_total)
-        discriminator_loss = bce_disc_y_x + bce_disc_y_draw_hat
+        encoder_loss = torch.sum(kld_loss) + torch.sum(feature_loss)
+        discriminator_loss = torch.sum(bce_disc_y_x) + torch.sum(bce_disc_y_draw_hat)
+        decoder_loss = torch.sum(lambda_mse * feature_loss) - (1.0 - lambda_mse) * discriminator_loss
 
         # Reporting
         batch_encoder_loss += torch.mean(encoder_loss).item() / batch_size
@@ -156,10 +150,8 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
             vaegan.zero_grad()
             # Enc_optim.zero_grad()
             encoder_loss.backward(retain_graph=True)
-            for p in vaegan.encoder.parameters():
-                p.grad.data.clamp_(-1, 1)
-
             Enc_optim.step()
+
             vaegan.zero_grad()
 
             # Selectively train decoder and discriminator
@@ -183,16 +175,11 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
             # if train_dec:
             Dec_optim.zero_grad()
             decoder_loss.backward(retain_graph=True)
-            for p in vaegan.decoder.parameters():
-                p.grad.data.clamp_(-1, 1)
-
             Dec_optim.step()
 
             # if train_disc:
             Disc_optim.zero_grad()
             discriminator_loss.backward()
-            for p in vaegan.discriminator.parameters():
-                p.grad.data.clamp_(-1, 1)
             Disc_optim.step()
 
     # all done
@@ -281,3 +268,6 @@ for epoch in range(args.epochs):
     lambda_mse *= args.decay_mse
     if lambda_mse > 1:
         lambda_mse = 1
+
+# TensorboardX logger
+logger.close()
