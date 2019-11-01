@@ -1,20 +1,11 @@
-import argparse
+import torch.nn as nn
 import torch
-from torch.optim import RMSprop
-from torch.optim.lr_scheduler import ExponentialLR
-
-from tensorboardX import SummaryWriter
-import torchvision.utils as tvu
-
-from models import *
-from utils import *
-from data import *
 
 # Enable CUDA, set tensor type and device
 
 torch.cuda.set_device(0)
 
-if  torch.cuda.is_available():
+if torch.cuda.is_available():
     dtype = torch.cuda.FloatTensor
     device = torch.device("cuda:0")
     print('GPU')
