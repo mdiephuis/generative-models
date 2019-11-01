@@ -2,7 +2,6 @@
 graphs/
 latent_temp_dir/
 todo.txt
-test.py
 data/
 models/
 output/
