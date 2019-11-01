@@ -309,10 +309,8 @@ class VAEGAN(nn.Module):
         x_hat_features = self.discriminator(x_hat, self.reconstruction_level, 'reconstruction')
 
         # Draw an x from the z distribution
-        use_cuda = x.is_cuda
         x_draw = torch.randn(x.size(0), self.latent_dim)
-        x_draw = x_draw.cuda() if use_cuda else x_draw
-        torch.cuda.empty_cache()
+        x_draw = x_draw.cuda() if x.is_cuda else x_draw
 
         # Decode
         x_draw_hat = self.decoder(x_draw)
@@ -321,6 +319,7 @@ class VAEGAN(nn.Module):
         y_x = self.discriminator(x, mode='classifier')
         y_x_hat = self.discriminator(x_hat, mode='classifier')
         y_draw_hat = self.discriminator(x_draw_hat, mode='classifier')
+
         return mu, log_var, x_hat, x_draw_hat, x_features, x_hat_features, y_x, y_x_hat, y_draw_hat
 
     def reconstruct(self, x):
