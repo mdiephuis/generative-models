@@ -60,7 +60,7 @@ h = dout.size(0) // 2
 y_x = dout[:h]
 y_draw_hat = dout[h:]
 
-# bce over the labels for the discriminator/gan
+# bce over the labels for the discriminator/gan for 'true' and 'fake' labels
 bce_disc_y_x = -torch.log(y_x + 1e-3)
 bce_disc_y_draw_hat = -torch.log(1 - y_draw_hat + 1e-3)
 
@@ -74,10 +74,8 @@ print(discriminator_loss.item())
 y_x = D1(x)
 y_draw_hat = D1(x_hat)
 
-# bce over the labels for the discriminator/gan
+# bce over the labels for the discriminator/gan for 'true' and 'fake' labels
 bce_disc_y_x = -torch.log(y_x + 1e-3)
-
-# bce_disc_y_x_hat = torch.sum(-torch.log(1 - y_x_hat + 1e-3))
 bce_disc_y_draw_hat = -torch.log(1 - y_draw_hat + 1e-3)
 
 
