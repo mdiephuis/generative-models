@@ -317,10 +317,10 @@ class VAEGAN(nn.Module):
 
         # Discriminator class estimation
         y_x = self.discriminator(x, mode='classifier')
-        y_x_hat = self.discriminator(x_hat, mode='classifier')
+        # y_x_hat = self.discriminator(x_hat, mode='classifier')
         y_draw_hat = self.discriminator(x_draw_hat, mode='classifier')
 
-        return mu, log_var, x_hat, x_draw_hat, x_features, x_hat_features, y_x, y_x_hat, y_draw_hat
+        return mu, log_var, x_hat, x_draw_hat, x_features, x_hat_features, y_x, y_draw_hat
 
     def reconstruct(self, x):
         mu, log_var = self.encoder(x)

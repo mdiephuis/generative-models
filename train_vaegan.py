@@ -29,8 +29,8 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='Input training batch-size (default: 64)')
 
 # Optimizer
-parser.add_argument('--epochs', type=int, default=100, metavar='N',
-                    help='Number of epochs (default: 100)')
+parser.add_argument('--epochs', type=int, default=20, metavar='N',
+                    help='Number of epochs (default: 20)')
 
 # Noise dimension Generator
 parser.add_argument('--latent-size', type=int, default=128, metavar='N',
@@ -123,7 +123,7 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
         x = x.cuda() if args.cuda else x
 
         # base forward pass, no training
-        mu, log_var, x_hat, x_draw_hat, x_features, x_hat_features, y_x, y_x_hat, y_draw_hat = vaegan(x)
+        mu, log_var, x_hat, x_draw_hat, x_features, x_hat_features, y_x, y_draw_hat = vaegan(x)
 
         # negative loglikelihood loss
         recon_loss = fn_loss_mse(x.view(batch_size, -1), x_hat.view(batch_size, -1))
@@ -136,14 +136,14 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
 
         # bce over the labels for the discriminator/gan
         bce_disc_y_x = torch.sum(-torch.log(y_x + 1e-3))
-        bce_disc_y_x_hat = torch.sum(-torch.log(1 - y_x_hat + 1e-3))
+        # bce_disc_y_x_hat = torch.sum(-torch.log(1 - y_x_hat + 1e-3))
         bce_disc_y_draw_hat = torch.sum(-torch.log(1 - y_draw_hat + 1e-3))
-        bce_disc_total = torch.sum(bce_disc_y_x + bce_disc_y_x_hat + bce_disc_y_draw_hat)
+        # bce_disc_total = torch.sum(bce_disc_y_x + bce_disc_y_x_hat + bce_disc_y_draw_hat)
 
         # Aggregate losses
         encoder_loss = kld_loss + feature_loss
         decoder_loss = lambda_mse * feature_loss - (1 - lambda_mse) * (bce_disc_total)
-        discriminator_loss = bce_disc_total
+        discriminator_loss = bce_disc_y_x + bce_disc_y_draw_hat
 
         # Reporting
         batch_encoder_loss += torch.mean(encoder_loss).item() / batch_size
@@ -156,6 +156,9 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
             vaegan.zero_grad()
             # Enc_optim.zero_grad()
             encoder_loss.backward(retain_graph=True)
+            for p in vaegan.encoder.parameters():
+                p.grad.data.clamp_(-1, 1)
+
             Enc_optim.step()
             vaegan.zero_grad()
 
@@ -180,11 +183,16 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
             # if train_dec:
             Dec_optim.zero_grad()
             decoder_loss.backward(retain_graph=True)
+            for p in vaegan.decoder.parameters():
+                p.grad.data.clamp_(-1, 1)
+
             Dec_optim.step()
 
             # if train_disc:
             Disc_optim.zero_grad()
             discriminator_loss.backward()
+            for p in vaegan.discriminator.parameters():
+                p.grad.data.clamp_(-1, 1)
             Disc_optim.step()
 
     # all done
