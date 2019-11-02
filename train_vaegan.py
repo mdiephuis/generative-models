@@ -83,7 +83,7 @@ if use_tb:
 # Enable CUDA, set tensor type and device
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
-torch.cuda.set_device(1)
+torch.cuda.set_device(0)
 
 if args.cuda:
     dtype = torch.cuda.FloatTensor
@@ -97,7 +97,7 @@ else:
 # Data set transforms
 transforms = [transforms.Resize((64, 64)), transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]
 
-# Get train and test loaders for dataset
+# DATASET
 loader = Loader(args.dataset_name, args.data_dir, True, args.batch_size, transforms, None, args.cuda)
 train_loader = loader.train_loader
 test_loader = loader.test_loader
@@ -171,15 +171,14 @@ def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium
                 train_disc = True
                 train_dec = True
 
-            # if train_dec:
-            Dec_optim.zero_grad()
-            decoder_loss.backward(retain_graph=True)
-            Dec_optim.step()
+            if train_dec:
+                decoder_loss.backward(retain_graph=True)
+                Dec_optim.step()
+                vaegan.discriminator.zero_grad()
 
-            # if train_disc:
-            Disc_optim.zero_grad()
-            discriminator_loss.backward()
-            Disc_optim.step()
+            if train_disc:
+                discriminator_loss.backward()
+                Disc_optim.step()
 
     # all done
     batch_encoder_loss /= (batch_idx + 1)
@@ -226,7 +225,7 @@ def execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
 
 
 # Model definitions
-reconstruction_level = 2
+reconstruction_level = 1
 in_channels = 1
 
 vaegan = VAEGAN(in_channels, args.latent_size, reconstruction_level).type(dtype)
