@@ -30,7 +30,6 @@ class Discriminator(nn.Module):
         return self.output_network(x.view(x.size(0), -1))
 
 
-
 # default weight init
 D1 = Discriminator()
 

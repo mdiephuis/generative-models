@@ -10,7 +10,6 @@ from models import *
 from utils import *
 from data import *
 
-
 parser = argparse.ArgumentParser(description='VAEGAN')
 
 
@@ -29,8 +28,8 @@ parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='Input training batch-size (default: 64)')
 
 # Optimizer
-parser.add_argument('--epochs', type=int, default=20, metavar='N',
-                    help='Number of epochs (default: 20)')
+parser.add_argument('--epochs', type=int, default=100, metavar='N',
+                    help='Number of epochs (default: 100)')
 
 # Noise dimension Generator
 parser.add_argument('--latent-size', type=int, default=128, metavar='N',
