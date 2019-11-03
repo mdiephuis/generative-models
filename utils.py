@@ -3,6 +3,12 @@ import torch.nn as nn
 import torch.nn.init as init
 
 
+# REF: https://www.tensorflow.org/api_docs/python/tf/nn/sigmoid_cross_entropy_with_logits
+def loss_bce(x_hat, x):
+    loss = x_hat.clamp(min=0) - x_hat * x + torch.log(1 + torch.exp(-torch.abs(x_hat)))
+    return torch.mean(loss)
+
+
 def sample_uniform_noise(batch_size, dim):
     return torch.Tensor(batch_size, dim).uniform_(-1, 1)
 
