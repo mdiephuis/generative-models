@@ -94,13 +94,26 @@ else:
     device = torch.device("cpu")
 
 
-# Data set transforms
-transforms = [transforms.Resize((64, 64)), transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]
+# ugly
+if args.dataset_name == 'CelebA':
 
-# DATASET
-loader = Loader(args.dataset_name, args.data_dir, True, args.batch_size, transforms, None, args.cuda)
-train_loader = loader.train_loader
-test_loader = loader.test_loader
+    reconstruction_level = 2
+    in_channels = 3
+
+    loader = CelebALoader(args.data_dir, args.batch_size, 0.2, True, True, args.cuda)
+    train_loader = loader.train_loader
+    test_loader = loader.test_loader
+else:
+    reconstruction_level = 1
+    in_channels = 1
+
+    # Data set transforms
+    transforms = [transforms.Resize((64, 64)), transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]
+
+    # DATASET
+    loader = Loader(args.dataset_name, args.data_dir, True, args.batch_size, transforms, None, args.cuda)
+    train_loader = loader.train_loader
+    test_loader = loader.test_loader
 
 
 def train_validate(vaegan, Enc_optim, Dec_optim, Disc_optim, margin, equilibrium, lambda_mse, loader, epoch, train):
@@ -225,9 +238,6 @@ def execute_graph(vaegan, Enc_optim, Dec_optim, Disc_optim, enc_schedular,
 
 
 # Model definitions
-reconstruction_level = 1
-in_channels = 1
-
 vaegan = VAEGAN(in_channels, args.latent_size, reconstruction_level).type(dtype)
 
 # Init
