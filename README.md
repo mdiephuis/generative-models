@@ -23,12 +23,12 @@ MNIST Generation results after 3000 iterations:
 ## vae-gan
 Pytorch implementation of VAEGAN. [[Paper]](https://arxiv.org/abs/1512.09300)
 
-CelebA generation after 1 epoch
+CelebA generation after 1 epoch:
 <p align="center">
     <img src="assets/veagan_0.png" width="315"\>
 </p>
 
-Cropped CelebA generation after 4 epochs
+Cropped CelebA generation after 4 epochs:
 <p align="center">
     <img src="assets/veagan_crop_4.png" width="315"\>
 </p>
