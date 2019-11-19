@@ -95,17 +95,21 @@ class gauss_circle(object):
 
 class CelebALoader(object):
     """
-    loader for the CELEB-A dataset
+    loader for the CELEB-A dataset 40: 218-30, 15:178-15
     """
-    def __init__(self, file_path, batch_size, valid_size, shuffle, use_cuda):
+    def __init__(self, file_path, batch_size, valid_size, crop, shuffle, use_cuda):
 
         kwargs = {'num_workers': 4, 'pin_memory': True} if use_cuda else {}
 
-        transform = transforms.Compose([
-            transforms.Resize((64, 64)),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
+        transform_list = []
+        if crop:
+            transform_list.append(transforms.CenterCrop(128))
+
+        transform_list.append(transforms.Resize((64, 64)))
+        transform_list.append(transforms.ToTensor())
+        transform_list.append(transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)))
+
+        transform = transforms.Compose(transform_list)
 
         train_dataset, test_dataset = self.get_dataset(file_path, transform)
 
@@ -124,6 +128,9 @@ class CelebALoader(object):
         # Set the loaders
         self.train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=train_sampler, **kwargs)
         self.test_loader = DataLoader(test_dataset, batch_size=batch_size, sampler=valid_sampler, **kwargs)
+
+        tmp_batch, _ = self.train_loader.__iter__().__next__()
+        self.img_shape = list(tmp_batch.size())[1:]
 
     @staticmethod
     def get_dataset(file_path, transform):
