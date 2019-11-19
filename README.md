@@ -27,6 +27,7 @@ CelebA generation after 1 epoch
 <p align="center">
     <img src="assets/veagan_0.png" width="315"\>
 </p>
+
 Cropped CelebA generation after 4 epochs
 <p align="center">
     <img src="assets/veagan_crop_4.png" width="315"\>
