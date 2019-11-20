@@ -115,3 +115,36 @@ def latentcluster2d_example(E, model_type, data_loader, use_pca, use_cuda):
         centroids = centroids[:, :2]
 
     return centroids.numpy(), labels
+
+
+def aae_generation_example(G, model_type, latent_size, n_samples, img_shape, use_cuda):
+
+    z_real = sample_uniform_noise(n_samples, latent_size).view(-1, latent_size, 1, 1)
+    z_real = z_real.cuda() if use_cuda else z_real
+
+    if model_type != 'conv':
+        z_real = z_real.view(-1, latent_size)
+
+    x_hat = G(z_real).cpu().view(n_samples, 1, img_shape[0], img_shape[1])
+
+    return x_hat
+
+
+def aae_reconstruct(E, G, model_type, test_loader, n_samples, img_shape, use_cuda):
+    E.eval()
+    G.eval()
+
+    x, _ = next(iter(test_loader))
+    x = x.cuda() if use_cuda else x
+
+    if model_type != 'conv':
+        x = x.view(-1, img_shape[0] * img_shape[1])
+
+    z_val = E(x)
+
+    x_hat = G(z_val)
+
+    x = x[:n_samples].cpu().view(10 * img_shape[0], img_shape[1])
+    x_hat = x_hat[:n_samples].cpu().view(10 * img_shape[0], img_shape[1])
+    comparison = torch.cat((x, x_hat), 1).view(10 * img_shape[0], 2 * img_shape[1])
+    return comparison
