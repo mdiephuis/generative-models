@@ -72,3 +72,46 @@ def vaegan_generation_example(vaegan, noise_dim, n_samples, img_shape, use_cuda)
     x_hat = x_hat * 0.5 + 0.5
 
     return x_hat
+
+
+def pca_project(x, num_elem=2):
+
+    if isinstance(x, torch.Tensor) and len(x.size()) == 3:
+        batch_proj = []
+        for batch_ind in range(x.size(0)):
+            tensor_proj = pca_project(x[batch_ind].squeeze(0), num_elem)
+            batch_proj.append(tensor_proj)
+        return torch.cat(batch_proj)
+
+    xm = x - torch.mean(x, 1, keepdim=True)
+    xx = torch.matmul(xm, torch.transpose(xm, 0, -1))
+    u, s, _ = torch.svd(xx)
+    x_proj = torch.matmul(u[:, 0:num_elem], torch.diag(s[0:num_elem]))
+    return x_proj
+
+
+def latentcluster2d_example(E, model_type, data_loader, use_pca, use_cuda):
+    E.eval()
+    img_shape = data_loader.img_shape[1:]
+
+    data = []
+    labels = []
+    for _, (x, y) in enumerate(data_loader.test_loader):
+        x = x.cuda() if use_cuda else x
+        if model_type != 'conv':
+            x = x.view(-1, img_shape[0] * img_shape[1])
+
+        z = E(x)
+        data.append(z.detach().cpu())
+        y = y.detach().cpu().numpy()
+        labels.extend(y.flatten())
+
+    centroids = torch.cat(data)
+    centroids = centroids.reshape(-1, z.size(1))
+
+    if centroids.size(1) > 2 and use_pca:
+        centroids = pca_project(centroids, 2)
+    elif centroids.size(1) > 2:
+        centroids = centroids[:, :2]
+
+    return centroids.numpy(), labels
