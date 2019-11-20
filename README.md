@@ -33,10 +33,6 @@ Cropped CelebA generation after 4 epochs:
     <img src="assets/veagan_crop_4.png" width="315"\>
 </p>
 
-## alpha-gan
-AlphaGAN: Generative adversarial networks for natural image matting [[Paper]](https://arxiv.org/abs/1807.10088)
-
-
 ## AAE
 Adversarial Auto Encoder [[Paper]](https://arxiv.org/abs/1511.05644)
 
