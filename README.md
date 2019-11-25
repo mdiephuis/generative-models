@@ -32,3 +32,7 @@ Cropped CelebA generation after 4 epochs:
 <p align="center">
     <img src="assets/veagan_crop_4.png" width="315"\>
 </p>
+
+## AAE
+Adversarial Auto Encoder [[Paper]](https://arxiv.org/abs/1511.05644)
+
