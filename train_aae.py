@@ -41,11 +41,11 @@ parser.add_argument('--epochs', type=int, default=25, metavar='N',
 parser.add_argument('--elr', type=float, default=1e-3,
                     help='Encoder Learning rate (default: 1e-3')
 parser.add_argument('--erlr', type=float, default=1e-4,
-                    help='Encoder Learning rate (default: 1e-4')
+                    help='Encoder Learning rate (default: 1e-3')
 parser.add_argument('--glr', type=float, default=1e-3,
                     help='Generator Learning rate (default: 1e-3')
 parser.add_argument('--dlr', type=float, default=1e-4,
-                    help='Discriminator Learning rate (default: 1e-4')
+                    help='Discriminator Learning rate (default: 5e-5')
 parser.add_argument('--log-dir', type=str, default='runs',
                     help='logging directory (default: logs)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -132,7 +132,7 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
 
         # Discriminator forward
         # 1) sample real z
-        z_real = autograd.Variable(sample_uniform_noise(batch_size, args.latent_size).view(-1, args.latent_size))
+        z_real = sample_gauss_noise(batch_size, args.latent_size).view(-1, args.latent_size)
         z_real = z_real.cuda() if args.cuda else z_real
 
         # 2) Encoder forward, get latent z from data
@@ -158,15 +158,14 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
             D_optim.step()
 
         # Encoder forward, Discriminator
-        for it in range(3):
-            z_fake = E(x).squeeze().detach()
-            y_hat_fake = D(z_fake)
-            ER_loss = -torch.mean(torch.log(y_hat_fake + 1e-9))
-            ER_batch_loss += ER_loss.item() / batch_size
+        z_fake = E(x)
+        y_hat_fake = D(z_fake.squeeze())
+        ER_loss = -torch.mean(torch.log(y_hat_fake + 1e-9))
+        ER_batch_loss += ER_loss.item() / batch_size
 
-            if train:
-                ER_loss.backward()
-                ER_optim.step()
+        if train:
+            ER_loss.backward()
+            ER_optim.step()
 
     # collect better stats
     return EG_batch_loss / (batch_idx + 1), D_batch_loss / (batch_idx + 1), ER_batch_loss / (batch_idx + 1)
@@ -214,7 +213,8 @@ def execute_graph(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, m
 if args.model_type == 'conv':
     E = AAE_Encoder(1, args.latent_size, 128).type(dtype)
     G = AAE_Generator(1, args.latent_size, 128).type(dtype)
-    D = AAE_Discriminator(args.latent_size, 128).type(dtype)
+    # D = AAE_Discriminator(args.latent_size, 128).type(dtype)
+    D = AAE_MNIST_Discriminator(args.latent_size).type(dtype)
 else:
     E = AAE_MNIST_Encoder(32 * 32, args.latent_size).type(dtype)
     G = AAE_MNIST_Generator(32 * 32, args.latent_size).type(dtype)

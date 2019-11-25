@@ -119,7 +119,7 @@ def latentcluster2d_example(E, model_type, data_loader, use_pca, use_cuda):
 
 def aae_generation_example(G, model_type, latent_size, n_samples, img_shape, use_cuda):
 
-    z_real = sample_uniform_noise(n_samples, latent_size).view(-1, latent_size, 1, 1)
+    z_real = sample_gauss_noise(n_samples, latent_size).view(-1, latent_size, 1, 1)
     z_real = z_real.cuda() if use_cuda else z_real
 
     if model_type != 'conv':
