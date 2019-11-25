@@ -440,7 +440,7 @@ class AAE_MNIST_Generator(nn.Module):
             nn.Linear(self.latent_size, self.out_channels),
             nn.LeakyReLU(0.2),
             nn.Linear(self.out_channels, self.out_channels),
-            nn.LeakyReLU(0.2)
+            nn.Sigmoid()
         )
 
     def forward(self, x):

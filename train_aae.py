@@ -41,11 +41,11 @@ parser.add_argument('--epochs', type=int, default=25, metavar='N',
 parser.add_argument('--elr', type=float, default=1e-3,
                     help='Encoder Learning rate (default: 1e-3')
 parser.add_argument('--erlr', type=float, default=1e-4,
-                    help='Encoder Learning rate (default: 1e-3')
+                    help='Encoder Learning rate (default: 1e-4')
 parser.add_argument('--glr', type=float, default=1e-3,
                     help='Generator Learning rate (default: 1e-3')
-parser.add_argument('--dlr', type=float, default=1e-3,
-                    help='Discriminator Learning rate (default: 1e-3')
+parser.add_argument('--dlr', type=float, default=1e-4,
+                    help='Discriminator Learning rate (default: 1e-4')
 parser.add_argument('--log-dir', type=str, default='runs',
                     help='logging directory (default: logs)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -88,8 +88,8 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
     data_loader = loader.train_loader if train else loader.test_loader
 
     # loss definitions
-    bce_loss = nn.BCELoss(reduction='sum')
-    mse_loss = nn.MSELoss(reduction='sum')
+    bce_loss = nn.BCELoss(reduction='mean')
+    mse_loss = nn.MSELoss(reduction='mean')
 
     E.train() if train else E.eval()
     D.train() if train else D.eval()
@@ -122,7 +122,7 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
         x_hat = G(z_fake)
 
         # reconstruction loss
-        EG_loss = mse_loss(x_hat.view(-1, 1), x.view(-1, 1))
+        EG_loss = bce_loss(x_hat.view(-1, 1), x.view(-1, 1))
         EG_batch_loss += EG_loss.item() / batch_size
 
         if train:
