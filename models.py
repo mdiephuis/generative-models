@@ -420,14 +420,17 @@ class AAE_MNIST_Encoder(nn.Module):
         self.latent_size = latent_size
 
         self.network = nn.Sequential(
-            nn.Linear(self.in_channels, self.latent_size),
+            nn.Linear(self.in_channels, self.in_channels // 2),
             nn.LeakyReLU(0.2),
+            nn.Dropout(0.1),
+            nn.Linear(self.in_channels // 2, self.latent_size),
+            nn.LeakyReLU(0.2),
+            nn.Dropout(0.1),
             nn.Linear(self.latent_size, self.latent_size)
         )
 
     def forward(self, x):
-        x = self.network(x)
-        return torch.tanh(x)
+        return self.network(x)
 
 
 class AAE_MNIST_Generator(nn.Module):
@@ -437,8 +440,12 @@ class AAE_MNIST_Generator(nn.Module):
         self.latent_size = latent_size
 
         self.network = nn.Sequential(
+            nn.Linear(self.latent_size, self.latent_size),
+            nn.LeakyReLU(0.2),
+            nn.Dropout(0.1),
             nn.Linear(self.latent_size, self.out_channels),
             nn.LeakyReLU(0.2),
+            nn.Dropout(0.1),
             nn.Linear(self.out_channels, self.out_channels),
             nn.Sigmoid()
         )

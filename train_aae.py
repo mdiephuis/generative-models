@@ -27,7 +27,9 @@ parser = argparse.ArgumentParser(description='AAE')
 parser.add_argument('--uid', type=str, default='AAE',
                     help='Staging identifier (default: AAE)')
 parser.add_argument('--model-type', type=str, default='conv',
-                    help='Type of model')
+                    help='Type of model (default conv)')
+parser.add_argument('--prior', type=str, default='gaussian-mixture',
+                    help='Prior distribution (default: gaussian mixture')
 parser.add_argument('--dataset-name', type=str, default='FashionMNIST',
                     help='Name of dataset (default: FashionMNIST')
 parser.add_argument('--data-dir', type=str, default='data',
@@ -99,9 +101,12 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
     D_batch_loss = 0
     ER_batch_loss = 0
 
-    for batch_idx, (x, _) in enumerate(data_loader):
+    for batch_idx, (x, y) in enumerate(data_loader):
 
         x = x.cuda() if args.cuda else x
+        y = one_hot(y, data_loader.num_class)
+        y = y.cuda() if args.cuda else y
+
         batch_size = x.size(0)
         if model_type != 'conv':
             x = x.view(batch_size, -1)
@@ -145,7 +150,15 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
         y_real = y_real.cuda() if args.cuda else y_real
         y_fake = y_fake.cuda() if args.cuda else y_fake
 
+        # Draw z one hot labels from prior type
+
+
+
         # Discriminator forward on sampled z_real and z_fake from encoder
+        # with added class label information
+        z_real = torch.cat((z_real, ), 1)
+        z_fake = torch.cat((z_fake, y), 1)
+
         y_hat_real = D(z_real)
         y_hat_fake = D(z_fake)
 
@@ -213,8 +226,7 @@ def execute_graph(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, m
 if args.model_type == 'conv':
     E = AAE_Encoder(1, args.latent_size, 128).type(dtype)
     G = AAE_Generator(1, args.latent_size, 128).type(dtype)
-    # D = AAE_Discriminator(args.latent_size, 128).type(dtype)
-    D = AAE_MNIST_Discriminator(args.latent_size).type(dtype)
+    D = AAE_Discriminator(args.latent_size, 128).type(dtype)
 else:
     E = AAE_MNIST_Encoder(32 * 32, args.latent_size).type(dtype)
     G = AAE_MNIST_Generator(32 * 32, args.latent_size).type(dtype)

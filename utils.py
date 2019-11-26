@@ -17,6 +17,18 @@ def sample_gauss_noise(batch_size, dim):
     return torch.Tensor(batch_size, dim).normal_(0, 1)
 
 
+def one_hot(labels, n_class):
+
+    # Ensure labels are [N x 1]
+    if len(list(labels.size())) == 1:
+        labels = labels.unsqueeze(1)
+
+    mask = torch.DoubleTensor(labels.size(0), n_class).fill_(0)
+
+    # scatter dimension, position indices, fill_value
+    return mask.scatter_(1, labels, 1)
+
+
 def init_normal_weights(module, mu, std):
     for m in module.modules():
         if isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
