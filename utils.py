@@ -1,6 +1,23 @@
 import torch
 import torch.nn as nn
 import torch.nn.init as init
+import numpy as np
+
+
+def pca_project(x, num_elem=2):
+
+    if isinstance(x, torch.Tensor) and len(x.size()) == 3:
+        batch_proj = []
+        for batch_ind in range(x.size(0)):
+            tensor_proj = pca_project(x[batch_ind].squeeze(0), num_elem)
+            batch_proj.append(tensor_proj)
+        return torch.cat(batch_proj)
+
+    xm = x - torch.mean(x, 1, keepdim=True)
+    xx = torch.matmul(xm, torch.transpose(xm, 0, -1))
+    u, s, _ = torch.svd(xx)
+    x_proj = torch.matmul(u[:, 0:num_elem], torch.diag(s[0:num_elem]))
+    return x_proj
 
 
 # REF: https://www.tensorflow.org/api_docs/python/tf/nn/sigmoid_cross_entropy_with_logits
@@ -86,22 +103,6 @@ def vaegan_generation_example(vaegan, noise_dim, n_samples, img_shape, use_cuda)
     return x_hat
 
 
-def pca_project(x, num_elem=2):
-
-    if isinstance(x, torch.Tensor) and len(x.size()) == 3:
-        batch_proj = []
-        for batch_ind in range(x.size(0)):
-            tensor_proj = pca_project(x[batch_ind].squeeze(0), num_elem)
-            batch_proj.append(tensor_proj)
-        return torch.cat(batch_proj)
-
-    xm = x - torch.mean(x, 1, keepdim=True)
-    xx = torch.matmul(xm, torch.transpose(xm, 0, -1))
-    u, s, _ = torch.svd(xx)
-    x_proj = torch.matmul(u[:, 0:num_elem], torch.diag(s[0:num_elem]))
-    return x_proj
-
-
 def latentcluster2d_example(E, model_type, data_loader, use_pca, use_cuda):
     E.eval()
     img_shape = data_loader.img_shape[1:]
@@ -160,3 +161,22 @@ def aae_reconstruct(E, G, model_type, test_loader, n_samples, img_shape, use_cud
     x_hat = x_hat[:n_samples].cpu().view(10 * img_shape[0], img_shape[1])
     comparison = torch.cat((x, x_hat), 1).view(10 * img_shape[0], 2 * img_shape[1])
     return comparison
+
+
+def aae_manifold_generation_example(G, model_type, img_shape, use_cuda):
+    # This nifty little grid trick is from:
+    # https://github.com/fastforwardlabs/vae-tf/blob/master/plot.py
+
+    z_range = 3
+    nx, ny = 15, 15
+    # gives (15, 15, 2) or (_, _) z pair, per image we wish to generate
+    zgrid = np.rollaxis(np.mgrid[z_range:-z_range:ny * 1j, -z_range:z_range:nx * 1j], 0, 3)
+    zgrid = zgrid.reshape([-1, 2])
+
+    zgrid = torch.from_numpy(zgrid).type(torch.FloatTensor)
+    zgrid = zgrid.cuda() if use_cuda else zgrid
+
+    # Generator forward
+    manifold = G(zgrid)
+    manifold = manifold.cpu().view(nx * img_shape[0], ny * img_shape[1])
+    return manifold

@@ -138,7 +138,9 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
 
         # Discriminator forward
         # 1) sample real z
-        z_real = sample_gauss_noise(batch_size, args.latent_size).view(-1, args.latent_size)
+        # z_real = sample_gauss_noise(batch_size, args.latent_size).view(-1, args.latent_size)
+        z_real = gaussian_mixture(batch_size, loader.num_class, 0.5, 0.1, None)
+        z_real = torch.from_numpy(z_real).type(torch.FloatTensor)
         z_real = z_real.cuda() if args.cuda else z_real
 
         # 2) Encoder forward, get latent z from data
@@ -231,7 +233,7 @@ def execute_graph(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, m
         logger.add_image('reconstruction example', reconstructed, epoch)
 
         # Manifold generation example
-        sample = aae_generation_example(G, args.model_type, img_shape, args.cuda)
+        sample = aae_manifold_generation_example(G, args.model_type, img_shape, args.cuda)
         sample = sample.detach()
         sample = tvu.make_grid(sample, normalize=True, scale_each=True)
         logger.add_image('manifold example', sample, epoch)
