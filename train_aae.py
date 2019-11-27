@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 
 from models import *
 from utils import *
+from prior import *
 from data import *
 
 mpl.use('Agg')
@@ -34,20 +35,20 @@ parser.add_argument('--dataset-name', type=str, default='FashionMNIST',
                     help='Name of dataset (default: FashionMNIST')
 parser.add_argument('--data-dir', type=str, default='data',
                     help='Path to dataset (default: data')
-parser.add_argument('--latent-size', type=int, default=20, metavar='N',
-                    help='VAE latent size (default: 20')
+parser.add_argument('--latent-size', type=int, default=2, metavar='N',
+                    help='VAE latent size (default: 2')
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input training batch-size')
 parser.add_argument('--epochs', type=int, default=25, metavar='N',
                     help='number of training epochs')
 parser.add_argument('--elr', type=float, default=1e-3,
                     help='Encoder Learning rate (default: 1e-3')
-parser.add_argument('--erlr', type=float, default=1e-4,
+parser.add_argument('--erlr', type=float, default=1e-3,
                     help='Encoder Learning rate (default: 1e-3')
 parser.add_argument('--glr', type=float, default=1e-3,
                     help='Generator Learning rate (default: 1e-3')
-parser.add_argument('--dlr', type=float, default=1e-4,
-                    help='Discriminator Learning rate (default: 5e-5')
+parser.add_argument('--dlr', type=float, default=1e-3 / 5,
+                    help='Discriminator Learning rate (default: 1e-3 / 5')
 parser.add_argument('--log-dir', type=str, default='runs',
                     help='logging directory (default: logs)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -104,7 +105,7 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
     for batch_idx, (x, y) in enumerate(data_loader):
 
         x = x.cuda() if args.cuda else x
-        y = one_hot(y, data_loader.num_class)
+        y = one_hot(y, loader.num_class).type(torch.FloatTensor)
         y = y.cuda() if args.cuda else y
 
         batch_size = x.size(0)
@@ -151,12 +152,19 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
         y_fake = y_fake.cuda() if args.cuda else y_fake
 
         # Draw z one hot labels from prior type
+        z_label = np.random.randint(0, loader.num_class, batch_size)
+        z_sample = gaussian_mixture(batch_size, loader.num_class, 0.5, 0.1, z_label)
+        z_label = torch.from_numpy(z_label).type(torch.LongTensor)
+        z_sample = torch.from_numpy(z_sample)
 
+        z_label = one_hot(z_label, loader.num_class).type(torch.FloatTensor)
 
+        z_label = z_label.cuda() if args.cuda else z_label
+        z_sample = z_sample.cuda() if args.cuda else z_sample
 
         # Discriminator forward on sampled z_real and z_fake from encoder
         # with added class label information
-        z_real = torch.cat((z_real, ), 1)
+        z_real = torch.cat((z_sample, z_label), 1)
         z_fake = torch.cat((z_fake, y), 1)
 
         y_hat_real = D(z_real)
@@ -172,6 +180,9 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
 
         # Encoder forward, Discriminator
         z_fake = E(x)
+        # Add label information
+        z_fake = torch.cat((z_fake, y), 1)
+
         y_hat_fake = D(z_fake.squeeze())
         ER_loss = -torch.mean(torch.log(y_hat_fake + 1e-9))
         ER_batch_loss += ER_loss.item() / batch_size
@@ -219,6 +230,12 @@ def execute_graph(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, m
         reconstructed = tvu.make_grid(reconstructed, normalize=True, scale_each=True)
         logger.add_image('reconstruction example', reconstructed, epoch)
 
+        # Manifold generation example
+        sample = aae_generation_example(G, args.model_type, img_shape, args.cuda)
+        sample = sample.detach()
+        sample = tvu.make_grid(sample, normalize=True, scale_each=True)
+        logger.add_image('manifold example', sample, epoch)
+
     return EG_v_loss, D_v_loss, ER_v_loss
 
 
@@ -226,11 +243,11 @@ def execute_graph(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, m
 if args.model_type == 'conv':
     E = AAE_Encoder(1, args.latent_size, 128).type(dtype)
     G = AAE_Generator(1, args.latent_size, 128).type(dtype)
-    D = AAE_Discriminator(args.latent_size, 128).type(dtype)
+    D = AAE_Discriminator(args.latent_size + loader.num_class, 128).type(dtype)
 else:
     E = AAE_MNIST_Encoder(32 * 32, args.latent_size).type(dtype)
     G = AAE_MNIST_Generator(32 * 32, args.latent_size).type(dtype)
-    D = AAE_MNIST_Discriminator(args.latent_size).type(dtype)
+    D = AAE_MNIST_Discriminator(args.latent_size + loader.num_class, 32 * 32).type(dtype)
 
 
 # Init module weights
