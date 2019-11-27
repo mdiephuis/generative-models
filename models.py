@@ -420,13 +420,13 @@ class AAE_MNIST_Encoder(nn.Module):
         self.latent_size = latent_size
 
         self.network = nn.Sequential(
-            nn.Linear(self.in_channels, self.in_channels // 2),
+            nn.Linear(self.in_channels, self.in_channels),
             nn.LeakyReLU(0.2),
             nn.Dropout(0.1),
-            nn.Linear(self.in_channels // 2, self.latent_size),
+            nn.Linear(self.in_channels, self.in_channels),
             nn.LeakyReLU(0.2),
             nn.Dropout(0.1),
-            nn.Linear(self.latent_size, self.latent_size)
+            nn.Linear(self.in_channels, self.latent_size)
         )
 
     def forward(self, x):
@@ -440,10 +440,10 @@ class AAE_MNIST_Generator(nn.Module):
         self.latent_size = latent_size
 
         self.network = nn.Sequential(
-            nn.Linear(self.latent_size, self.latent_size),
+            nn.Linear(self.latent_size, self.out_channels),
             nn.LeakyReLU(0.2),
             nn.Dropout(0.1),
-            nn.Linear(self.latent_size, self.out_channels),
+            nn.Linear(self.out_channels, self.out_channels),
             nn.LeakyReLU(0.2),
             nn.Dropout(0.1),
             nn.Linear(self.out_channels, self.out_channels),
@@ -456,14 +456,19 @@ class AAE_MNIST_Generator(nn.Module):
 
 
 class AAE_MNIST_Discriminator(nn.Module):
-    def __init__(self, latent_size):
+    def __init__(self, latent_size, hidden_size):
         super(AAE_MNIST_Discriminator, self).__init__()
         self.latent_size = latent_size
+        self.hidden_size = hidden_size
 
         self.network = nn.Sequential(
-            nn.Linear(self.latent_size, self.latent_size // 2),
+            nn.Linear(self.latent_size, self.hidden_size),
             nn.LeakyReLU(0.2),
-            nn.Linear(self.latent_size // 2, 1)
+            nn.Dropout(0.1),
+            nn.Linear(self.hidden_size, self.hidden_size),
+            nn.LeakyReLU(0.2),
+            nn.Dropout(0.1),
+            nn.Linear(self.hidden_size, 1)
         )
 
     def forward(self, x):
