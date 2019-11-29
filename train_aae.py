@@ -27,12 +27,12 @@ parser = argparse.ArgumentParser(description='AAE')
 # Task parametersm and model name
 parser.add_argument('--uid', type=str, default='AAE',
                     help='Staging identifier (default: AAE)')
-parser.add_argument('--model-type', type=str, default='conv',
-                    help='Type of model (default conv)')
+parser.add_argument('--model-type', type=str, default='linear',
+                    help='Type of model (default linear)')
 parser.add_argument('--prior', type=str, default='gaussian-mixture',
                     help='Prior distribution (default: gaussian mixture')
-parser.add_argument('--dataset-name', type=str, default='FashionMNIST',
-                    help='Name of dataset (default: FashionMNIST')
+parser.add_argument('--dataset-name', type=str, default='mnist',
+                    help='Name of dataset (default: MNIST')
 parser.add_argument('--data-dir', type=str, default='data',
                     help='Path to dataset (default: data')
 parser.add_argument('--latent-size', type=int, default=2, metavar='N',
@@ -157,7 +157,7 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
         z_label = np.random.randint(0, loader.num_class, batch_size)
         z_sample = gaussian_mixture(batch_size, loader.num_class, 0.5, 0.1, z_label)
         z_label = torch.from_numpy(z_label).type(torch.LongTensor)
-        z_sample = torch.from_numpy(z_sample)
+        z_sample = torch.from_numpy(z_sample).type(torch.FloatTensor)
 
         z_label = one_hot(z_label, loader.num_class).type(torch.FloatTensor)
 
@@ -173,6 +173,8 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
         y_hat_fake = D(z_fake)
 
         # Discriminator loss
+        # print(y_hat_real[0:10])
+        # print(y_hat_fake[0:10])
         D_loss = bce_loss(y_hat_fake, y_fake) + bce_loss(y_hat_real, y_real)
         D_batch_loss += D_loss.item() / batch_size
 
@@ -237,6 +239,8 @@ def execute_graph(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, m
         sample = sample.detach()
         sample = tvu.make_grid(sample, normalize=True, scale_each=True)
         logger.add_image('manifold example', sample, epoch)
+
+        latent_space_representation(G, img_shape, epoch, args.cuda)
 
     return EG_v_loss, D_v_loss, ER_v_loss
 

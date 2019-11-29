@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.init as init
 import numpy as np
 from scipy.stats import norm
+import matplotlib.pyplot as plt
 
 
 def pca_project(x, num_elem=2):
@@ -175,7 +176,7 @@ def aae_manifold_generation_example(G, model_type, img_shape, use_cuda):
     zgrid = zgrid.reshape([-1, 2])
 
     DELTA = 1E-10
-    zgrid_normal = np.array([norm.ppf(np.clip(z_i, DELTA, 0.9999999)) for z_i in zgrid])
+    zgrid_normal = np.array([norm.ppf(np.clip(z_i, DELTA, 0.9999999), loc=0, scale=1) for z_i in zgrid])
 
     zgrid_normal = torch.from_numpy(zgrid_normal).type(torch.FloatTensor)
     zgrid_normal = zgrid_normal.cuda() if use_cuda else zgrid_normal
@@ -184,3 +185,24 @@ def aae_manifold_generation_example(G, model_type, img_shape, use_cuda):
     manifold = G(zgrid_normal)
     manifold = manifold.cpu().view(nx * img_shape[0], ny * img_shape[1])
     return manifold
+
+
+def latent_space_representation(G, img_shape, epoch, use_cuda):
+    z_range = 1
+    nx, ny = 15, 15
+
+    z1 = np.linspace(- z_range, z_range, ny)
+    z2 = np.linspace(- z_range, z_range, nx)
+    manifold = np.zeros(shape=(img_shape[0] * nx, img_shape[1] * ny))
+    x_pixel, y_pixel = 0, 0
+    for i in z1:
+        for j in z2:
+            z = torch.FloatTensor([i, j])
+            z = z.cuda() if use_cuda else z
+            sample = G(z).cpu().detach().numpy().reshape(img_shape[0], img_shape[1])
+            manifold[x_pixel:x_pixel + img_shape[0], y_pixel:y_pixel + img_shape[1]] = sample
+            y_pixel += img_shape[1]
+        x_pixel += img_shape[0]
+        y_pixel = 0
+    plt.imshow(manifold, extent=[- z_range, z_range, - z_range, z_range])
+    plt.savefig('results/manifold_example_{}.png'.format(epoch))
