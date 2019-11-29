@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 import numpy as np
+from scipy.stats import norm
 
 
 def pca_project(x, num_elem=2):
@@ -167,16 +168,19 @@ def aae_manifold_generation_example(G, model_type, img_shape, use_cuda):
     # This nifty little grid trick is from:
     # https://github.com/fastforwardlabs/vae-tf/blob/master/plot.py
 
-    z_range = 3
+    z_range = 1
     nx, ny = 15, 15
     # gives (15, 15, 2) or (_, _) z pair, per image we wish to generate
     zgrid = np.rollaxis(np.mgrid[z_range:-z_range:ny * 1j, -z_range:z_range:nx * 1j], 0, 3)
     zgrid = zgrid.reshape([-1, 2])
 
-    zgrid = torch.from_numpy(zgrid).type(torch.FloatTensor)
-    zgrid = zgrid.cuda() if use_cuda else zgrid
+    DELTA = 1E-10
+    zgrid_normal = np.array([norm.ppf(np.clip(z_i, DELTA, 0.9999999)) for z_i in zgrid])
+
+    zgrid_normal = torch.from_numpy(zgrid_normal).type(torch.FloatTensor)
+    zgrid_normal = zgrid_normal.cuda() if use_cuda else zgrid_normal
 
     # Generator forward
-    manifold = G(zgrid)
+    manifold = G(zgrid_normal)
     manifold = manifold.cpu().view(nx * img_shape[0], ny * img_shape[1])
     return manifold

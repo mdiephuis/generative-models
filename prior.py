@@ -1,8 +1,7 @@
 import numpy as np
-
-
 # Gaussian 2D mixture
 # Inspired from https://github.com/hwalsuklee/tensorflow-mnist-AAE
+
 
 def transform_sample(x, y, label, num_labels, shift=1.4):
     radius = 2.0 * np.pi / float(num_labels) * float(label)
@@ -24,4 +23,5 @@ def gaussian_mixture(batch_size, num_labels, x_std, y_std, labels):
     z = np.empty((batch_size, 2), dtype=np.float32)
     for i in range(batch_size):
         z[i, :] = transform_sample(x[i], y[i], labels[i], num_labels)
+
     return z
