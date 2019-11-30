@@ -232,7 +232,7 @@ def execute_graph(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, m
         logger.add_image('reconstruction example', reconstructed, epoch)
 
         # Manifold generation example
-        sample = latent_space_representation(G, img_shape, epoch, args.cuda)
+        sample = aae_manifold_generation_example(G, img_shape, epoch, args.cuda)
         sample = sample.detach()
         sample = tvu.make_grid(sample, normalize=True, scale_each=True)
         logger.add_image('manifold example', sample, epoch)
