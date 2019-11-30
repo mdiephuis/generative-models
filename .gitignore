@@ -8,6 +8,7 @@ output/
 runs/
 logs/
 *.pkl
+results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
