@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.init as init
 import numpy as np
 from scipy.stats import norm
+import os
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
@@ -208,4 +209,7 @@ def latent_space_representation(G, img_shape, epoch, use_cuda):
         x_pixel += img_shape[0]
         y_pixel = 0
     plt.imshow(manifold, extent=[- z_range, z_range, - z_range, z_range])
+    if not os.path.exists('results'):
+        os.makedirs('results')
     plt.savefig('results/manifold_example_{}.png'.format(epoch))
+    return torch.from_numpy(manifold)
