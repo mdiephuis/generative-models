@@ -92,7 +92,6 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
 
     # loss definitions
     bce_loss = nn.BCELoss(reduction='mean')
-    mse_loss = nn.MSELoss(reduction='mean')
 
     E.train() if train else E.eval()
     D.train() if train else D.eval()
@@ -173,8 +172,6 @@ def train_validate(E, D, G, E_optim, ER_optim, D_optim, G_optim, loader, epoch, 
         y_hat_fake = D(z_fake)
 
         # Discriminator loss
-        # print(y_hat_real[0:10])
-        # print(y_hat_fake[0:10])
         D_loss = bce_loss(y_hat_fake, y_fake) + bce_loss(y_hat_real, y_real)
         D_batch_loss += D_loss.item() / batch_size
 

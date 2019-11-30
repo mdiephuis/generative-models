@@ -3,7 +3,10 @@ import torch.nn as nn
 import torch.nn.init as init
 import numpy as np
 from scipy.stats import norm
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+
+mpl.use('Agg')
 
 
 def pca_project(x, num_elem=2):
