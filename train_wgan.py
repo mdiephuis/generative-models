@@ -187,10 +187,6 @@ def execute_graph(G, D, G_optim, D_optim, loader, curr_iter, use_tb):
     return G_v_loss, D_v_loss
 
 
-# # MNIST Model definitions
-# G = MNIST_Generator(args.noise_dim, 128, 28 * 28).type(dtype)
-# D = MNIST_Discriminator(28 * 28, 128).type(dtype)
-
 D = DCGAN_Discriminator(1).type(dtype)
 G = DCGAN_Generator(args.noise_dim).type(dtype)
 
